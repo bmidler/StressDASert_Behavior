@@ -3,22 +3,30 @@
 #SBATCH -J sleap_inference
 #SBATCH -p all
 
-#SBATCH -c 4
-#SBATCH --mem=32GB
+#SBATCH -c 7
+#SBATCH --mem=128GB
 #SBATCH --gpus=1
 #SBATCH -t 01:00:00
 
 module load anacondapy/2023.07-cuda
 source activate sleap
 
+# Print job, TF, and GPU information.
+echo "Current conda environment: $(conda info --envs | grep '*' | awk '{print $1}')"
+python -c "import tensorflow as tf; print('TensorFlow version:', tf.__version__); print('GPU devices:', tf.config.list_physical_devices('GPU'))"
+
 # Variables passed as command line arguments.
 video=$1
 centroid_model=$2
 centered_model=$3
-mouse_color=$4
+tracks_file_path=$4
+
+# Make file name the mouse color + _inference.h5.
+output_filename="${mouse_color}_inference.h5"
 
 # Run sleap inference.
-sleap-track -o "${mouse_color}_inference" --tracking.tracker flow --peak_threshold 0.3 --tracking.track_window 3 --tracking.post_connect_single_breaks 1 --tracking.similarity instance --tracking.clean_instance_count 1 --model $centroid_model --model  $centered_model $video
+# NOTE: -o flag for changing the output filename, --frames flag specifies only running on a subset of frames (for testing).
+sleap-track -o $tracks_file_path --frames 1-120 --tracking.tracker flow --peak_threshold 0.3 --tracking.track_window 3 --tracking.post_connect_single_breaks 1 --tracking.similarity instance --tracking.clean_instance_count 1 --model $centroid_model --model  $centered_model $video
 
 # Check if the sleap command was successful.
 if [ $? -eq 0 ]; then

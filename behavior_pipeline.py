@@ -23,6 +23,8 @@ same directory as that SBATCH script.
 ### Import statements.
 
 import os
+import cv2
+import h5py
 import time
 import subprocess
 import numpy as np
@@ -30,14 +32,16 @@ import numpy as np
 ### Global variables.
 
 MAKE_VIDEO = True
+BLACK_COLOR = "red"
+WHITE_COLOR = "blue"
 
 FILENAME_PREFIX = "/mnt/cup/labs/witten/"
-SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-25/Bl6SW_1/[2024-09-25_13-32-57]-SleapTrain_Bl6SW_1"
+SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-25/Bl6SW_3/[2024-09-25_14-00-35]-SleapTrain_Bl6SW_3"
 CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/FineTuned_241025_175234.centroid.n=717"
 CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/FineTuned_241027_112222.centered_instance.n=717"
 CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Baselines/SW/models/SW_centroid_v1/240927_195723.centroid.n=216"
 CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Baselines/SW/models/SW_centered_v1/240927_200825.centered_instance.n=216"
-ANIPOSE_CALIBRATION_FILE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-25/Bl6SW_1/[2024-09-25_13-32-57]-SleapTrain_Bl6SW_1/calibration-2024-09-25.toml"
+ANIPOSE_CALIBRATION_FILE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-25/Bl6SW_3/[2024-09-25_14-00-35]-SleapTrain_Bl6SW_3/calibration-2024-09-25.toml"
 SBATCH_SCRIPT = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Scripts/sleap_inference.sh"
 
 ### Function definitions.
@@ -80,6 +84,20 @@ def run_sleap_inference(session_folder, centroid_model, centered_model, mouse_co
         # Get video name being processed.
         video_name = video_path.split("/")[-1]
 
+        # Get the directory path of the video.
+        video_dir_path = os.path.dirname(video_path)
+
+        # Construct the global path for the tracks file.
+        global_tracks_file_path = os.path.join(video_dir_path, f"{mouse_color}_inference")
+
+        # Get the relative path for the tracks file.
+        cwd = os.getcwd()
+        relative_tracks_file_path = os.path.relpath(global_tracks_file_path, cwd)
+
+        # Check to see if a file with that name already exists, if so, delete.
+        if os.path.exists(global_tracks_file_path):
+            os.remove(global_tracks_file_path)
+
         # Get names for output and error files.
         error_file = f"{mouse_color}_{video_name}_errors.txt"
         output_file = f"{mouse_color}_{video_name}_outputs.txt"
@@ -87,7 +105,7 @@ def run_sleap_inference(session_folder, centroid_model, centered_model, mouse_co
         # Construct the command to run the SBATCH script with dynamic error and output file paths.
         command = (
             f"sbatch --error=SBATCH_outputs/{error_file} --output=SBATCH_outputs/{output_file} "
-            f"{SBATCH_SCRIPT} {video_path} {centroid_model} {centered_model} {mouse_color}"
+            f"{SBATCH_SCRIPT} {video_path} {centroid_model} {centered_model} {relative_tracks_file_path}"
         )
 
         # Run the command and capture the output and errors.
@@ -132,20 +150,16 @@ def wait_for_inference_to_complete(session_folder):
 
         for folder in video_folders:
             # Check for inference files for black mouse.
-            black_inference_file = os.path.join(session_folder, folder, "black_inference.h5")
-            if not os.path.exists(black_inference_file):
+            global_black_inference_file = os.path.join(session_folder, folder, "black_inference.slp")
+            if not os.path.exists(global_black_inference_file):
                 all_inference_files_present = False
                 break
 
             # Check for inference files for white mouse.
-            white_inference_file = os.path.join(session_folder, folder, "white_inference.h5")
-            if not os.path.exists(white_inference_file):
+            global_white_inference_file = os.path.join(session_folder, folder, "white_inference.slp")
+            if not os.path.exists(global_white_inference_file):
                 all_inference_files_present = False
                 break
-
-        if not all_inference_files_present:
-            print("\tInference files not yet generated. Checking again in 60 seconds.")
-            time.sleep(60)  # Wait for 60 seconds before checking again.
 
         else:
             all_inference_files_present = True
@@ -177,15 +191,17 @@ def run_anipose_triangulation():
 
     # Move white mouse inference files to the UnusedInference folders.
     for folder in video_folders:
-        white_inference_file = os.path.join(SESSION_FOLDER, folder, "white_inference.h5")
-        os.rename(white_inference_file, os.path.join(SESSION_FOLDER, folder, "UnusedInference", "white_inference.h5"))
+        white_inference_file = os.path.join(SESSION_FOLDER, folder, "white_inference.slp")
+        os.rename(white_inference_file, os.path.join(SESSION_FOLDER, folder, "UnusedInference", "white_inference.slp"))
 
     # Run anipose triangulation for black mouse using anipose_triangulation.sh script.
     print("Running anipose triangulation for black mouse...")
     session_directory = SESSION_FOLDER
     calibration_file = ANIPOSE_CALIBRATION_FILE
-    output_filename = "black_triangulated.h5"
-    command = (f"sbatch anipose_triangulation.sh {session_directory} {calibration_file} {output_filename}")
+    output_filename = "black_triangulated"
+    error_file = "SBATCH_outputs/black_triangulation_errors.txt"
+    output_file = "SBATCH_outputs/black_triangulation_outputs.txt"
+    command = (f"sbatch --error={error_file} --output={output_file} anipose_triangulation.sh {session_directory} {calibration_file} {output_filename}")
 
     # Run the command and capture the output and errors.
     result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -206,20 +222,22 @@ def run_anipose_triangulation():
 
     # Move white mouse inference files back to their original locations.
     for folder in video_folders:
-        reverted_path = os.path.join(SESSION_FOLDER, folder, "white_inference.h5")
-        os.rename(os.path.join(SESSION_FOLDER, folder, "UnusedInference", "white_inference.h5"), reverted_path)
+        reverted_path = os.path.join(SESSION_FOLDER, folder, "white_inference.slp")
+        os.rename(os.path.join(SESSION_FOLDER, folder, "UnusedInference", "white_inference.slp"), reverted_path)
 
     # Move black mouse inference files to the UnusedInference folders.
     for folder in video_folders:
-        black_inference_file = os.path.join(SESSION_FOLDER, folder, "black_inference.h5")
-        os.rename(black_inference_file, os.path.join(SESSION_FOLDER, folder, "UnusedInference", "black_inference.h5"))
+        black_inference_file = os.path.join(SESSION_FOLDER, folder, "black_inference.slp")
+        os.rename(black_inference_file, os.path.join(SESSION_FOLDER, folder, "UnusedInference", "black_inference.slp"))
 
     # Run anipose triangulation for white mouse using anipose_triangulation.sh script.
     print("Running anipose triangulation for white mouse...")
     session_directory = SESSION_FOLDER
     calibration_file = ANIPOSE_CALIBRATION_FILE
-    output_filename = "white_triangulated.h5"
-    command = (f"sbatch anipose_triangulation.sh {session_directory} {calibration_file} {output_filename}")
+    output_filename = "white_triangulated"
+    error_file = "white_triangulation_errors.txt"
+    output_file = "white_triangulation_outputs.txt"
+    command = (f"sbatch anipose_triangulation.sh {session_directory} {calibration_file} {output_filename}" f" --error=SBATCH_outputs/{error_file} --output=SBATCH_outputs/{output_file}")
 
     # Run the command and capture the output and errors.
     result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -240,14 +258,70 @@ def run_anipose_triangulation():
 
     # Move black mouse inference files back to their original locations.
     for folder in video_folders:
-        reverted_path = os.path.join(SESSION_FOLDER, folder, "black_inference.h5")
-        os.rename(os.path.join(SESSION_FOLDER, folder, "UnusedInference", "black_inference.h5"), reverted_path)
+        reverted_path = os.path.join(SESSION_FOLDER, folder, "black_inference.slp")
+        os.rename(os.path.join(SESSION_FOLDER, folder, "UnusedInference", "black_inference.slp"), reverted_path)
 
     # Delete the UnusedInference folders.
     for folder in video_folders:
         os.rmdir(os.path.join(SESSION_FOLDER, folder, "UnusedInference"))
 
-    print("Behavior pipeline completed successfully.")
+
+def make_single_video(video_path, black_tracks_path, white_tracks_path):
+    """
+    Makes a single video with overlaid tracks for both black and white mice.
+
+    Parameters:
+        - video_path (str): Path to the original video.
+        - black_tracks_path (str): Path to the black mouse tracks.
+        - white_tracks_path (str): Path to the white mouse tracks.
+
+    Returns:
+        - None.
+    """
+
+    ### Load the video.
+
+    cap = cv2.VideoCapture(video_path)
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+
+    # Get the frame height.
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    output_video_path = video_path.replace(".mp4", "_tracked.mp4")
+    out = cv2.VideoWriter(output_video_path, fourcc, fps, (frame_width, frame_height))
+
+    ### Load the tracks.
+
+    with h5py.File(black_tracks_path, "r") as f:
+        black_tracks = f["tracks"][:]
+    with h5py.File(white_tracks_path, "r") as f:
+        white_tracks = f["tracks"][:]
+
+    ### Loop through the video frames and overlay the tracks.
+
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        # Overlay black mouse tracks.
+        for track in black_tracks:
+            x, y = int(track[0]), int(track[1])  # Assuming track contains x, y coordinates.
+            cv2.circle(frame, (x, y), 5, (0, 0, 255), -1)  # Red for black mouse.
+
+        # Overlay white mouse tracks.
+        for track in white_tracks:
+            x, y = int(track[0]), int(track[1])
+            cv2.circle(frame, (x, y), 5, (255, 0, 0), -1) # Blue for white mouse.
+
+        # Write the frame to the output video.
+        out.write(frame)
+
+    # Release resources.
+    cap.release()
+    out.release()
+    print(f"\tCreated video with tracks: {output_video_path}")
 
 
 def make_video():
@@ -262,8 +336,33 @@ def make_video():
         - None.
     """
 
-    # TODO.
-    pass
+    ### Make seperate videos for each camera view with overlaid tracks.
+
+    # Get list of folders for each camera view in the session.
+    video_folders = [f for f in os.listdir(SESSION_FOLDER) if os.path.isdir(os.path.join(SESSION_FOLDER, f))]
+
+    # Get paths to the mp4 videos and tracks in each camera folder.
+    for folder in video_folders:
+        for file in os.listdir(os.path.join(SESSION_FOLDER, folder)):
+            if file.endswith(".mp4"):
+                video_path = os.path.join(SESSION_FOLDER, folder, file)
+                black_tracks_path = os.path.join(SESSION_FOLDER, folder, "black_inference.h5")
+                white_tracks_path = os.path.join(SESSION_FOLDER, folder, "white_inference.h5")
+                make_single_video(video_path, black_tracks_path, white_tracks_path)
+
+    ### Now make a seperate video of the skeletons.
+
+    # Load the 3D anipose triangulated files.
+    black_triangulated_path = os.path.join(SESSION_FOLDER, "black_triangulated.h5")
+    white_triangulated_path = os.path.join(SESSION_FOLDER, "white_triangulated.h5")
+
+    # Load the triangulated tracks.
+    with h5py.File(black_triangulated_path, "r") as f:
+        black_tracks = f["tracks"][:] # Assuming the tracks are stored in a dataset named "tracks".
+    with h5py.File(white_triangulated_path, "r") as f:
+        white_tracks = f["tracks"][:] # Assuming the tracks are stored in a dataset named "tracks".
+
+
 
 
 def main():
@@ -304,7 +403,6 @@ def main():
 
     print("Waiting for inference to complete...")
     wait_for_inference_to_complete(SESSION_FOLDER)
-    print("Inference complete and inference files generated.")
 
     ### Run anipose triangulation.
 

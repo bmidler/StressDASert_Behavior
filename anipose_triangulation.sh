@@ -7,11 +7,17 @@
 #SBATCH --mem=8GB
 #SBATCH -t 01:00:00
 
-#SBATCH --error=SBATCH_outputs/anipose_triangulation_error.txt
-#SBATCH --output=SBATCH_outputs/anipose_triangulation_output.txt
-
 module load anacondapy/2023.07-cuda
-source activate sleap-anipose
+# source activate sleap-anipose
+
+# echo "Current conda environment: $(conda info --envs | grep '*' | awk '{print $1}')"
+
+# Initialize conda
+eval "$(conda shell.bash hook)"
+conda activate sleap-anipose
+
+# Verify the current conda environment
+echo "Current conda environment: $(conda info --envs | grep '*' | awk '{print $1}')"
 
 session_directory=$1
 calibration_file=$2
