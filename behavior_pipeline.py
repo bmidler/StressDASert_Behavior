@@ -193,6 +193,8 @@ def run_anipose_triangulation():
         # Make sub-folder to hold the inference file not being used.
         os.makedirs(os.path.join(SESSION_FOLDER, folder, "UnusedInference"), exist_ok=True)
 
+    ### Black mouse.
+
     # Move white mouse inference files to the UnusedInference folders.
     for folder in video_folders:
         # Get list of all files with "white" in the name: move those files.
@@ -223,10 +225,13 @@ def run_anipose_triangulation():
         return
     else:
         # Extract and print the job ID.
-        if "\tSubmitted batch job" in output:
+        if "Submitted batch job" in output:
             job_id = output.split()[-1]
 
     print(f"\tRunning triangulation/reprojection for black mouse (Job ID: {job_id})")
+    time.sleep(15)  # Wait for the triangulation to finish.
+
+    ### White mouse.
 
     # Move white mouse inference files back to their original locations.
     for folder in video_folders:
@@ -249,8 +254,8 @@ def run_anipose_triangulation():
     session_directory = SESSION_FOLDER
     calibration_file = ANIPOSE_CALIBRATION_FILE
     output_filename = session_directory + "/" + "white_triangulated.h5"
-    error_file = "SBATCH_out/white_triangulation_errors.txt"
-    output_file = "SBATCH_out/white_triangulation_outputs.txt"
+    error_file = "SBATCH_outputs/white_triangulation_errors.txt"
+    output_file = "SBATCH_outputs/white_triangulation_outputs.txt"
     command = (f"sbatch --error={error_file} --output={output_file} anipose_triangulation.sh {session_directory} {calibration_file} {output_filename}")
 
     # Run the command and capture the output and errors.
@@ -266,10 +271,11 @@ def run_anipose_triangulation():
         return
     else:
         # Extract and print the job ID.
-        if "\tSubmitted batch job" in output:
+        if "Submitted batch job" in output:
             job_id = output.split()[-1]
 
     print(f"\tRunning triangulation/reprojection for white mouse (Job ID: {job_id})")
+    time.sleep(15)  # Wait for the triangulation to finish.
 
     # Move black mouse inference files back to their original locations.
     for folder in video_folders:
@@ -284,62 +290,108 @@ def run_anipose_triangulation():
         os.rmdir(os.path.join(SESSION_FOLDER, folder, "UnusedInference"))
 
 
-def make_single_video(video_path, black_tracks_path, white_tracks_path):
+def wait_for_triangulation_to_complete(session_folder):
     """
-    Makes a single video with overlaid tracks for both black and white mice.
+    A waiting function that makes sure triangulation and reprojection are done before advancing.
 
     Parameters:
-        - video_path (str): Path to the original video.
-        - black_tracks_path (str): Path to the black mouse tracks.
-        - white_tracks_path (str): Path to the white mouse tracks.
+        - session_folder (str): Path to the session folder containing video folders for each camera.
 
     Returns:
         - None.
     """
 
-    ### Load the video.
+    ### Loop until all triangulation/reprojection files are generated.
+
+    all_triangulation_files_present = False
+    while not all_triangulation_files_present:  # Keep looping until all triangulation files are present.
+
+        # Get list of files in session directory.
+        files = os.listdir(session_folder)
+
+        # Check for black mouse files.
+        black_triangulation_files = [f for f in files if "black_triangulated_reprojected" in f]
+        black_files_present = len(black_triangulation_files) > 0
+
+        # Check for white mouse files.
+        white_triangulation_files = [f for f in files if "white_triangulated_reprojected" in f]
+        white_files_present = len(white_triangulation_files) > 0
+
+        # Update the condition to check if both sets of files are present.
+        all_triangulation_files_present = black_files_present and white_files_present
+
+
+def make_single_video(video_path, black_tracks, white_tracks, fname):
+    """
+    Makes a single video with overlaid tracks for both black and white mice.
+
+    Parameters:
+        - video_path (str): Path to the original video.
+        - black_tracks (np.array): black tracks [frames, point, x, y]
+        - white_tracks (np.array): white tracks [frames, point, x, y]
+        - fname (str): Name of the output video.
+
+    Returns:
+        - None.
+    """
+
+    ### Open the video file.
 
     cap = cv2.VideoCapture(video_path)
-    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-
-    # Get the frame height.
-    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    if not cap.isOpened():
+        raise FileNotFoundError(f"Video file not found: {video_path}")
+    
+    # Get video properties.
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    output_video_path = video_path.replace(".mp4", "_tracked.mp4")
-    out = cv2.VideoWriter(output_video_path, fourcc, fps, (frame_width, frame_height))
+    out = cv2.VideoWriter(f"{fname}.mp4", fourcc, fps, (width, height))
+    n_frames = np.shape(black_tracks)[0] # In case I only tracked a subset of the video.
 
-    ### Load the tracks.
+    # Make sure the tracks are the same length.
+    assert np.shape(black_tracks)[0] == np.shape(white_tracks)[0], "Black and white tracks are not the same length."
 
-    with h5py.File(black_tracks_path, "r") as f:
-        black_tracks = f["tracks"][:]
-    with h5py.File(white_tracks_path, "r") as f:
-        white_tracks = f["tracks"][:]
+    # Report-out number of frames being tracked vs in the video.
+    n_frames_video = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(f"\tTracking {n_frames} frames out of {n_frames_video} in the video (based on the n frames tracked by sleap [0, n]).")
 
     ### Loop through the video frames and overlay the tracks.
 
+    frame_num = 0
     while cap.isOpened():
-        ret, frame = cap.read()
-        if not ret:
-            break
+            
+            # Read the frame.
+            ret, frame = cap.read()
+            if not ret:
+                break
+    
+            # Get the tracks for this frame.
+            black_frame_tracks = black_tracks[frame_num]
+            white_frame_tracks = white_tracks[frame_num]
+    
+            # Overlay the tracks on the frame, blue for white mouse, red for black mouse.
+            for i in range(black_frame_tracks.shape[0]):
+                x, y = int(black_frame_tracks[i, 0]), int(black_frame_tracks[i, 1])
+                cv2.circle(frame, (x, y), 5, (0, 0, 255), -1)
+            for i in range(white_frame_tracks.shape[0]):
+                x, y = int(white_frame_tracks[i, 0]), int(white_frame_tracks[i, 1])
+                cv2.circle(frame, (x, y), 5, (255, 0, 0), -1)
+    
+            # Write the frame to the output video.
+            out.write(frame)
+    
+            # Increment the frame number.
+            frame_num += 1
 
-        # Overlay black mouse tracks.
-        for track in black_tracks:
-            x, y = int(track[0]), int(track[1])  # Assuming track contains x, y coordinates.
-            cv2.circle(frame, (x, y), 5, (0, 0, 255), -1)  # Red for black mouse.
+            # Break if we've reached the end of the tracks.
+            if frame_num >= n_frames:
+                break
 
-        # Overlay white mouse tracks.
-        for track in white_tracks:
-            x, y = int(track[0]), int(track[1])
-            cv2.circle(frame, (x, y), 5, (255, 0, 0), -1) # Blue for white mouse.
+    ### Release the video and output video.
 
-        # Write the frame to the output video.
-        out.write(frame)
-
-    # Release resources.
     cap.release()
     out.release()
-    print(f"\tCreated video with tracks: {output_video_path}")
 
 
 def make_video():
@@ -356,29 +408,46 @@ def make_video():
 
     ### Make seperate videos for each camera view with overlaid tracks.
 
-    # Get list of folders for each camera view in the session.
-    video_folders = [f for f in os.listdir(SESSION_FOLDER) if os.path.isdir(os.path.join(SESSION_FOLDER, f))]
+    # Open reprojection h5 files for black and white mice.
+    black_reprojection_tracks_filepath = os.path.join(SESSION_FOLDER, "black_triangulated_reprojected.h5")
+    white_reprojection_tracks_filepath = os.path.join(SESSION_FOLDER, "white_triangulated_reprojected.h5")
 
-    # Get paths to the mp4 videos and tracks in each camera folder.
-    for folder in video_folders:
-        for file in os.listdir(os.path.join(SESSION_FOLDER, folder)):
-            if file.endswith(".mp4"):
-                video_path = os.path.join(SESSION_FOLDER, folder, file)
-                black_tracks_path = os.path.join(SESSION_FOLDER, folder, "black_inference.h5")
-                white_tracks_path = os.path.join(SESSION_FOLDER, folder, "white_inference.h5")
-                make_single_video(video_path, black_tracks_path, white_tracks_path)
+    black_reprojection_tracks_file = h5py.File(black_reprojection_tracks_filepath, "r")
+    white_reprojection_tracks_file = h5py.File(white_reprojection_tracks_filepath, "r")
 
-    ### Now make a seperate video of the skeletons.
+    # Parcelate out into individual camera views and squash dim 1 (only 1 instance).
+    black_Camera0 = black_reprojection_tracks_file["Camera0"][:, 0, :]
+    white_Camera0 = white_reprojection_tracks_file["Camera0"][:, 0, :]
+    black_Camera1 = black_reprojection_tracks_file["Camera1"][:, 0, :]
+    white_Camera1 = white_reprojection_tracks_file["Camera1"][:, 0, :]
+    black_Camera2 = black_reprojection_tracks_file["Camera2"][:, 0, :]
+    white_Camera2 = white_reprojection_tracks_file["Camera2"][:, 0, :]
+    black_Camera3 = black_reprojection_tracks_file["Camera3"][:, 0, :]
+    white_Camera3 = white_reprojection_tracks_file["Camera3"][:, 0, :]
 
-    # Load the 3D anipose triangulated files.
-    black_triangulated_path = os.path.join(SESSION_FOLDER, "black_triangulated.h5")
-    white_triangulated_path = os.path.join(SESSION_FOLDER, "white_triangulated.h5")
+    ### Make the videos.
 
-    # Load the triangulated tracks.
-    with h5py.File(black_triangulated_path, "r") as f:
-        black_tracks = f["tracks"][:] # Assuming the tracks are stored in a dataset named "tracks".
-    with h5py.File(white_triangulated_path, "r") as f:
-        white_tracks = f["tracks"][:] # Assuming the tracks are stored in a dataset named "tracks".
+    # Camera0.
+    camera0_directory = os.path.join(SESSION_FOLDER, "Camera0")
+    camera0_filepath = [f for f in os.listdir(camera0_directory) if f.endswith(".mp4")][0]
+    make_single_video(os.path.join(camera0_directory, camera0_filepath), black_Camera0, white_Camera0, os.path.join(camera0_directory, "Camera0_tracks"))
+
+    # Camera1.
+    camera1_directory = os.path.join(SESSION_FOLDER, "Camera1")
+    camera1_filepath = [f for f in os.listdir(camera1_directory) if f.endswith(".mp4")][0]
+    make_single_video(os.path.join(camera1_directory, camera1_filepath), black_Camera1, white_Camera1, os.path.join(camera1_directory, "Camera1_tracks"))
+
+    # Camera2.
+    camera2_directory = os.path.join(SESSION_FOLDER, "Camera2")
+    camera2_filepath = [f for f in os.listdir(camera2_directory) if f.endswith(".mp4")][0]
+    make_single_video(os.path.join(camera2_directory, camera2_filepath), black_Camera2, white_Camera2, os.path.join(camera2_directory, "Camera2_tracks"))
+
+    # Camera3.
+    camera3_directory = os.path.join(SESSION_FOLDER, "Camera3")
+    camera3_filepath = [f for f in os.listdir(camera3_directory) if f.endswith(".mp4")][0]
+    make_single_video(os.path.join(camera3_directory, camera3_filepath), black_Camera3, white_Camera3, os.path.join(camera3_directory, "Camera3_tracks"))
+
+    print("\tMade tracked point videos.")
 
 
 def main():
@@ -427,9 +496,15 @@ def main():
     ### Make video of the tracks if specified.
 
     if MAKE_VIDEO:
-        print("Making video of the tracks...")
 
+        # Wait for triangulation to complete.
+        print("Waiting for triangulation to complete...")
+        wait_for_triangulation_to_complete(SESSION_FOLDER)
+        print("Making video of the tracks...")
         make_video()
+
+    else:
+        print("Not making videos.")
 
 
 if __name__ == "__main__":
