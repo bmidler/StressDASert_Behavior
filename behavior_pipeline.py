@@ -149,17 +149,21 @@ def wait_for_inference_to_complete(session_folder):
     while not all_inference_files_present:  # Keep looping until all inference files are present.
 
         for folder in video_folders:
-            # Check for inference files for black mouse.
-            global_black_inference_file = os.path.join(session_folder, folder, "black_inference.slp")
-            if not os.path.exists(global_black_inference_file):
+            # Check for inference files for black mouse (if there's an h5 file with "black" in the name).
+            black_inference_files = [f for f in os.listdir(os.path.join(session_folder, folder)) if "black" in f and f.endswith(".h5")]
+            if len(black_inference_files) == 0:
                 all_inference_files_present = False
                 break
+            else:
+                all_inference_files_present = True
 
-            # Check for inference files for white mouse.
-            global_white_inference_file = os.path.join(session_folder, folder, "white_inference.slp")
-            if not os.path.exists(global_white_inference_file):
+            # Check for inference files for white mouse (if there's an h5 file with "white" in the name).
+            white_inference_files = [f for f in os.listdir(os.path.join(session_folder, folder)) if "white" in f and f.endswith(".h5")]
+            if len(white_inference_files) == 0:
                 all_inference_files_present = False
                 break
+            else:
+                all_inference_files_present = True
 
         else:
             all_inference_files_present = True
@@ -191,14 +195,17 @@ def run_anipose_triangulation():
 
     # Move white mouse inference files to the UnusedInference folders.
     for folder in video_folders:
-        white_inference_file = os.path.join(SESSION_FOLDER, folder, "white_inference.slp")
-        os.rename(white_inference_file, os.path.join(SESSION_FOLDER, folder, "UnusedInference", "white_inference.slp"))
+        # Get list of all files with "white" in the name: move those files.
+        files_to_move = [f for f in os.listdir(os.path.join(SESSION_FOLDER, folder)) if "white" in f]
+        for file in files_to_move:
+            white_inference_file = os.path.join(SESSION_FOLDER, folder, file)
+            os.rename(white_inference_file, os.path.join(SESSION_FOLDER, folder, "UnusedInference", file))  # Move to UnusedInference folder.
 
     # Run anipose triangulation for black mouse using anipose_triangulation.sh script.
     print("Running anipose triangulation for black mouse...")
     session_directory = SESSION_FOLDER
     calibration_file = ANIPOSE_CALIBRATION_FILE
-    output_filename = "black_triangulated"
+    output_filename = "black_triangulated.h5"
     error_file = "SBATCH_outputs/black_triangulation_errors.txt"
     output_file = "SBATCH_outputs/black_triangulation_outputs.txt"
     command = (f"sbatch --error={error_file} --output={output_file} anipose_triangulation.sh {session_directory} {calibration_file} {output_filename}")
@@ -213,6 +220,8 @@ def run_anipose_triangulation():
     # Print error message if there is one, otherwise print the job ID.
     if result.returncode != 0:
         print(f"\tError: {error}")
+        print("There was an error AHHHHHHHHHHHHHHH") # TODO: delete this eventually.
+        return
     else:
         # Extract and print the job ID.
         if "\tSubmitted batch job" in output:
@@ -222,22 +231,28 @@ def run_anipose_triangulation():
 
     # Move white mouse inference files back to their original locations.
     for folder in video_folders:
-        reverted_path = os.path.join(SESSION_FOLDER, folder, "white_inference.slp")
-        os.rename(os.path.join(SESSION_FOLDER, folder, "UnusedInference", "white_inference.slp"), reverted_path)
+        # Get list of all files in UnusedInference folder: move those files back.
+        files_to_move = [f for f in os.listdir(os.path.join(SESSION_FOLDER, folder, "UnusedInference")) if "white" in f]
+        for file in files_to_move:
+            reverted_path = os.path.join(SESSION_FOLDER, folder, file)
+            os.rename(os.path.join(SESSION_FOLDER, folder, "UnusedInference", file), reverted_path)  # Move back to original location.
 
     # Move black mouse inference files to the UnusedInference folders.
     for folder in video_folders:
-        black_inference_file = os.path.join(SESSION_FOLDER, folder, "black_inference.slp")
-        os.rename(black_inference_file, os.path.join(SESSION_FOLDER, folder, "UnusedInference", "black_inference.slp"))
+        # Get list of all files with "black" in the name: move those files.
+        files_to_move = [f for f in os.listdir(os.path.join(SESSION_FOLDER, folder)) if "black" in f]
+        for file in files_to_move:
+            black_inference_file = os.path.join(SESSION_FOLDER, folder, file)
+            os.rename(black_inference_file, os.path.join(SESSION_FOLDER, folder, "UnusedInference", file))  # Move to UnusedInference folder.
 
     # Run anipose triangulation for white mouse using anipose_triangulation.sh script.
     print("Running anipose triangulation for white mouse...")
     session_directory = SESSION_FOLDER
     calibration_file = ANIPOSE_CALIBRATION_FILE
-    output_filename = "white_triangulated"
-    error_file = "white_triangulation_errors.txt"
-    output_file = "white_triangulation_outputs.txt"
-    command = (f"sbatch anipose_triangulation.sh {session_directory} {calibration_file} {output_filename}" f" --error=SBATCH_outputs/{error_file} --output=SBATCH_outputs/{output_file}")
+    output_filename = "white_triangulated.h5"
+    error_file = "SBATCH_out/white_triangulation_errors.txt"
+    output_file = "SBATCH_out/white_triangulation_outputs.txt"
+    command = (f"sbatch --error={error_file} --output={output_file} anipose_triangulation.sh {session_directory} {calibration_file} {output_filename}")
 
     # Run the command and capture the output and errors.
     result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -249,6 +264,7 @@ def run_anipose_triangulation():
     # Print error message if there is one, otherwise print the job ID.
     if result.returncode != 0:
         print(f"\tError: {error}")
+        return
     else:
         # Extract and print the job ID.
         if "\tSubmitted batch job" in output:
@@ -258,8 +274,11 @@ def run_anipose_triangulation():
 
     # Move black mouse inference files back to their original locations.
     for folder in video_folders:
-        reverted_path = os.path.join(SESSION_FOLDER, folder, "black_inference.slp")
-        os.rename(os.path.join(SESSION_FOLDER, folder, "UnusedInference", "black_inference.slp"), reverted_path)
+        # Get list of all files in UnusedInference folder: move those files back.
+        files_to_move = [f for f in os.listdir(os.path.join(SESSION_FOLDER, folder, "UnusedInference")) if "black" in f]
+        for file in files_to_move:
+            reverted_path = os.path.join(SESSION_FOLDER, folder, file)
+            os.rename(os.path.join(SESSION_FOLDER, folder, "UnusedInference", file), reverted_path)  # Move back to original location.
 
     # Delete the UnusedInference folders.
     for folder in video_folders:
@@ -361,8 +380,6 @@ def make_video():
         black_tracks = f["tracks"][:] # Assuming the tracks are stored in a dataset named "tracks".
     with h5py.File(white_triangulated_path, "r") as f:
         white_tracks = f["tracks"][:] # Assuming the tracks are stored in a dataset named "tracks".
-
-
 
 
 def main():
