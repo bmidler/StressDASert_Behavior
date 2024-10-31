@@ -205,7 +205,7 @@ def run_anipose_triangulation():
     print("Running anipose triangulation for black mouse...")
     session_directory = SESSION_FOLDER
     calibration_file = ANIPOSE_CALIBRATION_FILE
-    output_filename = "black_triangulated.h5"
+    output_filename = session_directory + "/" + "black_triangulated.h5"
     error_file = "SBATCH_outputs/black_triangulation_errors.txt"
     output_file = "SBATCH_outputs/black_triangulation_outputs.txt"
     command = (f"sbatch --error={error_file} --output={output_file} anipose_triangulation.sh {session_directory} {calibration_file} {output_filename}")
@@ -220,7 +220,6 @@ def run_anipose_triangulation():
     # Print error message if there is one, otherwise print the job ID.
     if result.returncode != 0:
         print(f"\tError: {error}")
-        print("There was an error AHHHHHHHHHHHHHHH") # TODO: delete this eventually.
         return
     else:
         # Extract and print the job ID.
@@ -249,7 +248,7 @@ def run_anipose_triangulation():
     print("Running anipose triangulation for white mouse...")
     session_directory = SESSION_FOLDER
     calibration_file = ANIPOSE_CALIBRATION_FILE
-    output_filename = "white_triangulated.h5"
+    output_filename = session_directory + "/" + "white_triangulated.h5"
     error_file = "SBATCH_out/white_triangulation_errors.txt"
     output_file = "SBATCH_out/white_triangulation_outputs.txt"
     command = (f"sbatch --error={error_file} --output={output_file} anipose_triangulation.sh {session_directory} {calibration_file} {output_filename}")

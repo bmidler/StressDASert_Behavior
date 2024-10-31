@@ -18,8 +18,6 @@ session_directory=$1
 calibration_file=$2
 output_filename=$3
 
-echo $session_directory
-
 # Run triangulation.
 slap-triangulate --p2d $session_directory --calib $calibration_file --fname $output_filename
 
