@@ -522,6 +522,9 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
         # Create blank image.
         frame = np.ones((frame_size[1], frame_size[0], 3), dtype=np.uint8) * 255
 
+        # Create mask for semi-transparent areas.
+        mask = np.zeros((frame_size[1], frame_size[0], 3), dtype=np.uint8)
+
         # Project 3D points to 2D.
         black_2D = project_to_2d(black_3D_pose[frame_num], plane)
         white_2D = project_to_2d(white_3D_pose[frame_num], plane)
@@ -537,6 +540,26 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
         corners_2D[:, 0] += translation_x
         corners_2D[:, 1] += translation_y
 
+        # Define polygons for the walls and floor of the bounding box.
+        polygons = [
+            [corners_2D[0], corners_2D[1], corners_2D[5], corners_2D[4]],  # Bottom face
+            [corners_2D[0], corners_2D[1], corners_2D[3], corners_2D[2]],  # Left face
+            [corners_2D[0], corners_2D[2], corners_2D[6], corners_2D[4]],  # Front face
+            [corners_2D[4], corners_2D[5], corners_2D[7], corners_2D[6]],  # Right face
+            [corners_2D[1], corners_2D[3], corners_2D[7], corners_2D[5]],  # Back face
+            [corners_2D[2], corners_2D[3], corners_2D[7], corners_2D[6]]   # Top face
+        ]
+
+        # Fill polygons on the mask.
+        for polygon in polygons:
+            pts = np.array(polygon, np.int32)
+            pts = pts.reshape((-1, 1, 2))
+            cv2.fillPoly(mask, [pts], (128, 128, 128))
+
+        # Blend the mask with the frame.
+        alpha = 0.5
+        cv2.addWeighted(mask, alpha, frame, 1 - alpha, 0, frame)
+
         # Draw points for mice.
         for point in black_2D:
             x, y = int(point[0]), int(point[1])
@@ -551,13 +574,11 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
             x, y = int(corner[0]), int(corner[1])
             cv2.circle(frame, (x, y), 5, (0, 0, 0), -1)  # Black for corners.
 
-        # Draw lines connecting corners.
-        for i in range(4):
-            cv2.line(frame, (int(corners_2D[i][0]), int(corners_2D[i][1])), (int(corners_2D[i + 4][0]), int(corners_2D[i + 4][1])), (128, 128, 128), 2)
-            if i < 3:
-                cv2.line(frame, (int(corners_2D[i][0]), int(corners_2D[i][1])), (int(corners_2D[i + 1][0]), int(corners_2D[i + 1][1])), (128, 128, 128), 2)
-            cv2.line(frame, (int(corners_2D[i][0]), int(corners_2D[i][1])), (int(corners_2D[i + 3][0]), int(corners_2D[i + 3][1])), (128, 128, 128), 2)
-
+        # Draw bounding box corners in black.
+        for corner in corners_2D:
+            x, y = int(corner[0]), int(corner[1])
+            cv2.circle(frame, (x, y), 5, (0, 0, 0), -1)  # Black for corners.
+        
         # Write frame to video.
         out.write(frame)
 
