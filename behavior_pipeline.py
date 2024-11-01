@@ -16,8 +16,12 @@ Does the following:
     - Re-projects poses back to each camera view based on homogenized 3D pose.
     - Outputs video of the tracks.
 
-NOTE: sleap tracking is contingent on an SBATCH script for running on spock. This file must be in the
-same directory as that SBATCH script.
+NOTE: needs to be in same directory as sbatch scripts for inference and triangulation.
+NOTE: run this pythoon script via the behavior_pipeline.sh sbatch script.
+
+TODO:
+- Make video of just the tracked points.
+- Make demo video comparing video with reprojected points to original inference.
 """
 
 ### Import statements.
@@ -42,7 +46,8 @@ CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sle
 CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Baselines/SW/models/SW_centroid_v1/240927_195723.centroid.n=216"
 CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Baselines/SW/models/SW_centered_v1/240927_200825.centered_instance.n=216"
 ANIPOSE_CALIBRATION_FILE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-25/Bl6SW_3/[2024-09-25_14-00-35]-SleapTrain_Bl6SW_3/calibration-2024-09-25.toml"
-SBATCH_SCRIPT = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Scripts/sleap_inference.sh"
+INFERENCE_SBATCH_SCRIPT = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Scripts/_sleap_inference.sh"
+ANIPOSE_TRIANGULATION_SBATCH_SCRIPT = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Scripts/_anipose_triangulation.sh"
 
 ### Function definitions.
 
@@ -105,7 +110,7 @@ def run_sleap_inference(session_folder, centroid_model, centered_model, mouse_co
         # Construct the command to run the SBATCH script with dynamic error and output file paths.
         command = (
             f"sbatch --error=SBATCH_outputs/{error_file} --output=SBATCH_outputs/{output_file} "
-            f"{SBATCH_SCRIPT} {video_path} {centroid_model} {centered_model} {relative_tracks_file_path}"
+            f"{INFERENCE_SBATCH_SCRIPT} {video_path} {centroid_model} {centered_model} {relative_tracks_file_path}"
         )
 
         # Run the command and capture the output and errors.
@@ -118,6 +123,7 @@ def run_sleap_inference(session_folder, centroid_model, centered_model, mouse_co
         # Print error message if there is one, otherwise print the job ID.
         if result.returncode != 0:
             print(f"\tError: {error}")
+            return
         else:
             # Extract and print the job ID.
             if "Submitted batch job" in output:
@@ -175,7 +181,7 @@ def run_anipose_triangulation():
     This function uses the anipose_triangulation sbatch script and also runs reprojection.
 
     NOTE: because sleap anipose isn't able to differentiate the sleap track files for different mice,
-    this function creates a temporary sub-folder to put the sleap tracks for the mousenot being processed.
+    this function creates a temporary sub-folder to put the sleap tracks for the mouse not being processed.
 
     Parameters:
         - None.
@@ -210,7 +216,7 @@ def run_anipose_triangulation():
     output_filename = session_directory + "/" + "black_triangulated.h5"
     error_file = "SBATCH_outputs/black_triangulation_errors.txt"
     output_file = "SBATCH_outputs/black_triangulation_outputs.txt"
-    command = (f"sbatch --error={error_file} --output={output_file} anipose_triangulation.sh {session_directory} {calibration_file} {output_filename}")
+    command = (f"sbatch --error={error_file} --output={output_file} {ANIPOSE_TRIANGULATION_SBATCH_SCRIPT} {session_directory} {calibration_file} {output_filename}")
 
     # Run the command and capture the output and errors.
     result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -256,7 +262,7 @@ def run_anipose_triangulation():
     output_filename = session_directory + "/" + "white_triangulated.h5"
     error_file = "SBATCH_outputs/white_triangulation_errors.txt"
     output_file = "SBATCH_outputs/white_triangulation_outputs.txt"
-    command = (f"sbatch --error={error_file} --output={output_file} anipose_triangulation.sh {session_directory} {calibration_file} {output_filename}")
+    command = (f"sbatch --error={error_file} --output={output_file} {ANIPOSE_TRIANGULATION_SBATCH_SCRIPT} {session_directory} {calibration_file} {output_filename}")
 
     # Run the command and capture the output and errors.
     result = subprocess.run(command, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
@@ -394,6 +400,60 @@ def make_single_video(video_path, black_tracks, white_tracks, fname):
     out.release()
 
 
+def open_h5_file_with_retry(filepath, mode="r", retries=5, delay=2):
+    """
+    Attempts to open and return an h5 file, but retries if the file is locked (eg.g another process is accessing it).
+    Fixes an issue where the h5 reprojection files are locked by the anipose process.
+
+    Parameters:
+        - filepath (str): Path to the h5 file.
+        - mode (str): Mode to open the file in.
+        - retries (int): Number of times to retry opening the file.
+        - delay (int): Delay between retries.
+
+    Returns:
+        - file (h5py.File): Opened h5 file.
+    """
+    for attempt in range(retries):
+        try:
+            file = h5py.File(filepath, mode)
+            print(f"\tOpened file {filepath}.")
+            return file
+        except OSError as e:
+            if "unable to lock file" in str(e):
+                print(f"\tAttempt {attempt + 1} of {retries}: Unable to open file {filepath}. Retrying in {delay} seconds...")
+                time.sleep(delay)
+            else:
+                raise
+    raise OSError(f"\tFailed to open file {filepath} after {retries} attempts.")
+
+
+def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_folder):
+    """
+    Makes an animation of just the tracked points.
+
+    Parameters:
+        - black_3D_pose_filepath (str): Path to the black mouse 3D pose h5 file.
+        - white_3D_pose_filepath (str): Path to the white mouse 3D pose h5 file.
+        - session_folder (str): Path to the session folder containing video folders for each camera.
+
+    Returns:
+        - None.
+    """
+
+    ### Open the 3D pose files.
+
+    black_3D_pose_file = open_h5_file_with_retry(black_3D_pose_filepath)
+    white_3D_pose_file = open_h5_file_with_retry(white_3D_pose_filepath)
+
+    ### Print their structure.
+
+    print("\tBlack 3D pose file structure:")
+    for key in black_3D_pose_file.keys():
+        print(key)
+        print(f"\t\t{key}: {black_3D_pose_file[key].shape}")
+
+
 def make_video():
     """
     Uses the 3D triangulated and 2D reprojected pose files to create a video of the tracks both overlaid on the original videos
@@ -406,48 +466,47 @@ def make_video():
         - None.
     """
 
-    ### Make seperate videos for each camera view with overlaid tracks.
+    ### Make separate videos for each camera view with overlaid tracks.
 
     # Open reprojection h5 files for black and white mice.
     black_reprojection_tracks_filepath = os.path.join(SESSION_FOLDER, "black_triangulated_reprojected.h5")
     white_reprojection_tracks_filepath = os.path.join(SESSION_FOLDER, "white_triangulated_reprojected.h5")
 
-    black_reprojection_tracks_file = h5py.File(black_reprojection_tracks_filepath, "r")
-    white_reprojection_tracks_file = h5py.File(white_reprojection_tracks_filepath, "r")
+    black_reprojection_tracks_file = open_h5_file_with_retry(black_reprojection_tracks_filepath, "r")
+    white_reprojection_tracks_file = open_h5_file_with_retry(white_reprojection_tracks_filepath, "r")
 
-    # Parcelate out into individual camera views and squash dim 1 (only 1 instance).
-    black_Camera0 = black_reprojection_tracks_file["Camera0"][:, 0, :]
-    white_Camera0 = white_reprojection_tracks_file["Camera0"][:, 0, :]
-    black_Camera1 = black_reprojection_tracks_file["Camera1"][:, 0, :]
-    white_Camera1 = white_reprojection_tracks_file["Camera1"][:, 0, :]
-    black_Camera2 = black_reprojection_tracks_file["Camera2"][:, 0, :]
-    white_Camera2 = white_reprojection_tracks_file["Camera2"][:, 0, :]
-    black_Camera3 = black_reprojection_tracks_file["Camera3"][:, 0, :]
-    white_Camera3 = white_reprojection_tracks_file["Camera3"][:, 0, :]
+    # Get the list of camera views from the HDF5 file keys
+    camera_views = [key for key in black_reprojection_tracks_file.keys() if key.startswith("Camera")]
 
-    ### Make the videos.
+    # Assert the camera views are the same for both black and white mice.
+    assert camera_views == [key for key in white_reprojection_tracks_file.keys() if key.startswith("Camera")], "Camera views are not the same for black and white mice."
 
-    # Camera0.
-    camera0_directory = os.path.join(SESSION_FOLDER, "Camera0")
-    camera0_filepath = [f for f in os.listdir(camera0_directory) if f.endswith(".mp4")][0]
-    make_single_video(os.path.join(camera0_directory, camera0_filepath), black_Camera0, white_Camera0, os.path.join(camera0_directory, "Camera0_tracks"))
+    for i, camera_view in enumerate(camera_views):
+        print(f"\tMaking video for camera view {i + 1} of {len(camera_views)}...")
 
-    # Camera1.
-    camera1_directory = os.path.join(SESSION_FOLDER, "Camera1")
-    camera1_filepath = [f for f in os.listdir(camera1_directory) if f.endswith(".mp4")][0]
-    make_single_video(os.path.join(camera1_directory, camera1_filepath), black_Camera1, white_Camera1, os.path.join(camera1_directory, "Camera1_tracks"))
+        # Parcelate out into individual camera views and squash dim 1 (only 1 instance).
+        black_camera_tracks = black_reprojection_tracks_file[camera_view][:, 0, :]
+        white_camera_tracks = white_reprojection_tracks_file[camera_view][:, 0, :]
 
-    # Camera2.
-    camera2_directory = os.path.join(SESSION_FOLDER, "Camera2")
-    camera2_filepath = [f for f in os.listdir(camera2_directory) if f.endswith(".mp4")][0]
-    make_single_video(os.path.join(camera2_directory, camera2_filepath), black_Camera2, white_Camera2, os.path.join(camera2_directory, "Camera2_tracks"))
+        # Make the video for the current camera view.
+        camera_directory = os.path.join(SESSION_FOLDER, camera_view)
+        camera_filepath = [f for f in os.listdir(camera_directory) if f.endswith(".mp4")][0]
+        make_single_video(os.path.join(camera_directory, camera_filepath), black_camera_tracks, white_camera_tracks, os.path.join(camera_directory, f"{camera_view}_tracks"))
 
-    # Camera3.
-    camera3_directory = os.path.join(SESSION_FOLDER, "Camera3")
-    camera3_filepath = [f for f in os.listdir(camera3_directory) if f.endswith(".mp4")][0]
-    make_single_video(os.path.join(camera3_directory, camera3_filepath), black_Camera3, white_Camera3, os.path.join(camera3_directory, "Camera3_tracks"))
+    # Close the HDF5 files
+    black_reprojection_tracks_file.close()
+    white_reprojection_tracks_file.close()
 
     print("\tMade tracked point videos.")
+
+    ### Make a video of just the skeletons.
+
+    black_3D_pose_filepath = os.path.join(SESSION_FOLDER, "black_triangulated.h5")
+    white_3D_pose_filepath = os.path.join(SESSION_FOLDER, "white_triangulated.h5")
+
+    make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, SESSION_FOLDER)
+
+    print("\tMade skeleton videos.")
 
 
 def main():
@@ -471,8 +530,10 @@ def main():
         raise FileNotFoundError(f"Centered model (white) does not exist: {CENTERED_MODEL_WHITE}")
     if not os.path.exists(ANIPOSE_CALIBRATION_FILE):
         raise FileNotFoundError(f"Anipose calibration file does not exist: {ANIPOSE_CALIBRATION_FILE}")
-    if not os.path.exists(SBATCH_SCRIPT):
-        raise FileNotFoundError(f"SBATCH script does not exist: {SBATCH_SCRIPT}")
+    if not os.path.exists(INFERENCE_SBATCH_SCRIPT):
+        raise FileNotFoundError(f"SBATCH script does not exist: {INFERENCE_SBATCH_SCRIPT}")
+    if not os.path.exists(ANIPOSE_TRIANGULATION_SBATCH_SCRIPT):
+        raise FileNotFoundError(f"Anipose triangulation SBATCH script does not exist: {ANIPOSE_TRIANGULATION_SBATCH_SCRIPT}")
     
     ### Run sleap inference for each camera view (video) in the session for black and white mice.
 
