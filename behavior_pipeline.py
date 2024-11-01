@@ -623,6 +623,9 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
             pts = pts.reshape((-1, 1, 2))
             cv2.fillPoly(mask, [pts], (128, 128, 128))
 
+        # Blend the mask with the frame using additive blending.
+        frame = cv2.addWeighted(frame, 1, mask, 1, 0)
+
         # Blend the mask with the frame.
         alpha = 0.25
         cv2.addWeighted(mask, alpha, frame, 1 - alpha, 0, frame)
