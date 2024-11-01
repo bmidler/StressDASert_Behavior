@@ -504,6 +504,14 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
     # Project corners to 2D.
     corners_2D = project_to_2d(corners, plane)
 
+    # Calculate the center of the bounding box.
+    center_x = (max_x + min_x) / 2
+    center_y = (max_y + min_y) / 2
+
+    # Calculate the translation needed to center the bounding box in the frame.
+    translation_x = width / 2 - center_x
+    translation_y = height / 2 - center_y
+
     # Create video writer.
     output_video_path = output_video_path = os.path.join(session_folder, "skeleton_video.mp4")
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
@@ -521,10 +529,18 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
         black_2D = project_to_2d(black_3D_pose[frame_num], plane)
         white_2D = project_to_2d(white_3D_pose[frame_num], plane)
 
+        # Apply translation to center the points.
+        black_2D[:, 0] += translation_x
+        black_2D[:, 1] += translation_y
+        white_2D[:, 0] += translation_x
+        white_2D[:, 1] += translation_y
+        corners_2D[:, 0] += translation_x
+        corners_2D[:, 1] += translation_y
+
         # Draw points for mice.
         for point in black_2D:
             x, y = int(point[0]), int(point[1])
-            cv2.circle(frame, (x, y), 5, (0, 0, 255), -1)  # Red for black mouse
+            cv2.circle(frame, (x, y), 5, (0, 0, 255), -1)  # Red for black mouse.
 
         for point in white_2D:
             x, y = int(point[0]), int(point[1])
@@ -536,11 +552,11 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
             cv2.circle(frame, (x, y), 5, (0, 0, 0), -1)  # Black for corners.
 
         # Draw lines connecting corners.
-        for i in range(0, 4):
-            cv2.line(frame, (corners_2D[i][0], corners_2D[i][1]), (corners_2D[i + 4][0], corners_2D[i + 4][1]), (128, 128, 128), 2)
-            if i < 4:
-                cv2.line(frame, (corners_2D[i][0], corners_2D[i][1]), (corners_2D[i + 1][0], corners_2D[i + 1][1]), (128, 128, 128), 2)
-                cv2.line(frame, (corners_2D[i][0], corners_2D[i][1]), (corners_2D[i + 3][0], corners_2D[i + 3][1]), (128, 128, 128), 2)
+        for i in range(4):
+            cv2.line(frame, (int(corners_2D[i][0]), int(corners_2D[i][1])), (int(corners_2D[i + 4][0]), int(corners_2D[i + 4][1])), (128, 128, 128), 2)
+            if i < 3:
+                cv2.line(frame, (int(corners_2D[i][0]), int(corners_2D[i][1])), (int(corners_2D[i + 1][0]), int(corners_2D[i + 1][1])), (128, 128, 128), 2)
+            cv2.line(frame, (int(corners_2D[i][0]), int(corners_2D[i][1])), (int(corners_2D[i + 3][0]), int(corners_2D[i + 3][1])), (128, 128, 128), 2)
 
         # Write frame to video.
         out.write(frame)
@@ -588,7 +604,8 @@ def make_video():
         # Make the video for the current camera view.
         camera_directory = os.path.join(SESSION_FOLDER, camera_view)
         camera_filepath = [f for f in os.listdir(camera_directory) if f.endswith(".mp4")][0]
-        make_single_video(os.path.join(camera_directory, camera_filepath), black_camera_tracks, white_camera_tracks, os.path.join(camera_directory, f"{camera_view}_tracks"))
+        # TODO: uncomment this.
+        # make_single_video(os.path.join(camera_directory, camera_filepath), black_camera_tracks, white_camera_tracks, os.path.join(camera_directory, f"{camera_view}_tracks"))
 
     # Close the HDF5 files
     black_reprojection_tracks_file.close()
@@ -603,8 +620,9 @@ def make_video():
     white_3D_pose_filepath = os.path.join(SESSION_FOLDER, "white_triangulated.h5")
 
     # Get video information (width, height, fps) from the first video.
-    video_folder = os.listdir(SESSION_FOLDER)[0]
-    video_path = os.path.join(SESSION_FOLDER, video_folder, [f for f in os.listdir(os.path.join(SESSION_FOLDER, video_folder)) if f.endswith(".mp4")][0])
+    Camera0_directory = os.path.join(SESSION_FOLDER, "Camera0")
+    video_filename = [f for f in os.listdir(Camera0_directory) if f.endswith(".mp4") and "track" not in f][0] # Makes sure we grab the original video.
+    video_path = os.path.join(Camera0_directory, video_filename)
     cap = cv2.VideoCapture(video_path)
     width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
@@ -617,6 +635,8 @@ def make_video():
 
 
 def main():
+
+    """
 
     ### Check if there is a folder for SBATCH outputs. Make if not.
 
@@ -662,6 +682,8 @@ def main():
     run_anipose_triangulation()
 
     ### Make video of the tracks if specified.
+
+    """
 
     if MAKE_VIDEO:
 
