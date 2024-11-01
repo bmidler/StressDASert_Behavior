@@ -501,9 +501,6 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
     # Get the 2D plane.
     plane = np.array([[1, 0, 0], [0, 1, 0]])
 
-    # Project corners to 2D.
-    corners_2D = project_to_2d(corners, plane)
-
     # Calculate the center of the bounding box.
     center_x = (max_x + min_x) / 2
     center_y = (max_y + min_y) / 2
@@ -534,6 +531,9 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
         black_2D[:, 1] += translation_y
         white_2D[:, 0] += translation_x
         white_2D[:, 1] += translation_y
+
+        # Project corners to 2D and apply translation.
+        corners_2D = project_to_2d(corners, plane)
         corners_2D[:, 0] += translation_x
         corners_2D[:, 1] += translation_y
 
