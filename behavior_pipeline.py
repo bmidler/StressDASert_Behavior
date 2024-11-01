@@ -210,7 +210,7 @@ def run_anipose_triangulation():
             white_inference_file = os.path.join(SESSION_FOLDER, folder, file)
             os.rename(white_inference_file, os.path.join(SESSION_FOLDER, folder, "UnusedInference", file))  # Move to UnusedInference folder.
 
-    # Run anipose triangulation for black mouse using anipose_triangulation.sh script.
+    # Run anipose triangulation for black mouse using sbatch script.
     print("Running anipose triangulation for black mouse...")
     session_directory = SESSION_FOLDER
     calibration_file = ANIPOSE_CALIBRATION_FILE
@@ -238,8 +238,6 @@ def run_anipose_triangulation():
     print(f"\tRunning triangulation/reprojection for black mouse (Job ID: {job_id})")
     time.sleep(15)  # Wait for the triangulation to finish.
 
-    ### White mouse.
-
     # Move white mouse inference files back to their original locations.
     for folder in video_folders:
         # Get list of all files in UnusedInference folder: move those files back.
@@ -247,6 +245,8 @@ def run_anipose_triangulation():
         for file in files_to_move:
             reverted_path = os.path.join(SESSION_FOLDER, folder, file)
             os.rename(os.path.join(SESSION_FOLDER, folder, "UnusedInference", file), reverted_path)  # Move back to original location.
+
+    ### White mouse.
 
     # Move black mouse inference files to the UnusedInference folders.
     for folder in video_folders:
@@ -256,7 +256,7 @@ def run_anipose_triangulation():
             black_inference_file = os.path.join(SESSION_FOLDER, folder, file)
             os.rename(black_inference_file, os.path.join(SESSION_FOLDER, folder, "UnusedInference", file))  # Move to UnusedInference folder.
 
-    # Run anipose triangulation for white mouse using anipose_triangulation.sh script.
+    # Run anipose triangulation for white mouse using sbatch script.
     print("Running anipose triangulation for white mouse...")
     session_directory = SESSION_FOLDER
     calibration_file = ANIPOSE_CALIBRATION_FILE
@@ -566,9 +566,6 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
         # Create blank image.
         frame = np.ones((frame_size[1], frame_size[0], 3), dtype=np.uint8) * 255
 
-        # Create mask for semi-transparent areas.
-        mask = np.zeros((frame_size[1], frame_size[0], 3), dtype=np.uint8)
-
         # Calculate the rotation angle for the current frame.
         angle = 2 * np.pi * frame_num / num_frames
 
@@ -607,28 +604,39 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
         corners_2D[:, 0] += translation_x
         corners_2D[:, 1] += translation_y
 
-        # Define polygons for the walls and floor of the bounding box.
         polygons = [
-            [corners_2D[0], corners_2D[1], corners_2D[5], corners_2D[4]],  # Bottom face
-            [corners_2D[0], corners_2D[1], corners_2D[3], corners_2D[2]],  # Left face
-            [corners_2D[0], corners_2D[2], corners_2D[6], corners_2D[4]],  # Front face
-            [corners_2D[4], corners_2D[5], corners_2D[7], corners_2D[6]],  # Right face
-            [corners_2D[1], corners_2D[3], corners_2D[7], corners_2D[5]],  # Back face
-            [corners_2D[2], corners_2D[3], corners_2D[7], corners_2D[6]]   # Top face
+            [corners_2D[0], corners_2D[1], corners_2D[3], corners_2D[2]],
+            [corners_2D[4], corners_2D[5], corners_2D[7], corners_2D[6]],
+            [corners_2D[0], corners_2D[1], corners_2D[5], corners_2D[4]],
+            [corners_2D[2], corners_2D[3], corners_2D[7], corners_2D[6]],
+            [corners_2D[0], corners_2D[2], corners_2D[6], corners_2D[4]], # Floor.
         ]
 
-        # Fill polygons on the mask.
-        for polygon in polygons:
-            pts = np.array(polygon, np.int32)
-            pts = pts.reshape((-1, 1, 2))
-            cv2.fillPoly(mask, [pts], (128, 128, 128))
+        # Create a blank mask for counting overlaps.
+        overlap_mask = np.zeros((frame_size[1], frame_size[0]), dtype=np.uint8)
 
-        # Blend the mask with the frame using additive blending.
-        frame = cv2.addWeighted(frame, 1, mask, 1, 0)
+        # Fill polygons on the mask and count overlaps.
+        for i, polygon in enumerate(polygons):
+            # Create a temporary mask for the current polygon.
+            temp_mask = np.zeros((frame_size[1], frame_size[0]), dtype=np.uint8)
+            cv2.fillPoly(temp_mask, [np.array(polygon, np.int32)], 1)
 
-        # Blend the mask with the frame.
-        alpha = 0.25
-        cv2.addWeighted(mask, alpha, frame, 1 - alpha, 0, frame)
+            # Add the temporary mask to the overlap mask.
+            overlap_mask = cv2.add(overlap_mask, temp_mask)
+
+        # Normalize the overlap mask to the range [0, 255].
+        max_overlaps = len(polygons)
+        shading_scale = 255 // max_overlaps
+        shaded_mask = overlap_mask * shading_scale
+
+        # Convert the shaded mask to a 3-channel image.
+        shaded_mask_3ch = 255 - cv2.merge([shaded_mask, shaded_mask, shaded_mask]) # Need to invert the mask (higher values are lighter).
+
+        # Set corresponding indices in the frame to 0 before adding the shaded mask (prevents saturation).
+        frame[shaded_mask_3ch > 0] = 0
+
+        # Blend the shaded mask with the frame using additive blending.
+        frame = cv2.add(frame, shaded_mask_3ch)
 
         # Draw points for mice.
         for point in black_2D:
@@ -639,16 +647,17 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
             x, y = int(point[0]), int(point[1])
             cv2.circle(frame, (x, y), 5, (255, 0, 0), -1)  # Blue for white mouse.
 
-        # Draw bounding box (corners in black, with gray lines connecting them).
-        for corner in corners_2D:
-            x, y = int(corner[0]), int(corner[1])
-            cv2.circle(frame, (x, y), 5, (0, 0, 0), -1)  # Black for corners.
-
         # Draw bounding box corners in black.
         for corner in corners_2D:
             x, y = int(corner[0]), int(corner[1])
-            cv2.circle(frame, (x, y), 5, (0, 0, 0), -1)  # Black for corners.
-        
+            cv2.circle(frame, (x, y), 10, (0, 0, 0), -1)  # Black for corners.
+
+        # Using the 3D coordinates of the box corners, draw lines between adjacent (sharing at least one x, y, or z coordinate) corners.
+        for i in range(8):
+            for j in range(8): # Will be some redundant drawing.
+                if np.sum(np.abs(corners[i] - corners[j])) == max(np.abs(corners[i] - corners[j])):
+                    cv2.line(frame, (int(corners_2D[i][0]), int(corners_2D[i][1])), (int(corners_2D[j][0]), int(corners_2D[j][1])), (0, 0, 0), 2)
+
         # Write frame to video.
         out.write(frame)
 
