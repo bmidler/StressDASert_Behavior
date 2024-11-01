@@ -443,6 +443,61 @@ def project_to_2d(points, plane):
     return np.dot(points, plane.T)
 
 
+def rotation_matrix_x(angle):
+    """
+    Create a rotation matrix for rotating points around the x-axis.
+
+    Parameters:
+        - angle (float): The rotation angle in radians.
+
+    Returns:
+        - np.array: The rotation matrix.
+    """
+    cos_angle = np.cos(angle)
+    sin_angle = np.sin(angle)
+    return np.array([
+        [1, 0, 0],
+        [0, cos_angle, -sin_angle],
+        [0, sin_angle, cos_angle]
+    ])
+
+def rotation_matrix_y(angle):
+    """
+    Create a rotation matrix for rotating points around the y-axis.
+
+    Parameters:
+        - angle (float): The rotation angle in radians.
+
+    Returns:
+        - np.array: The rotation matrix.
+    """
+    cos_angle = np.cos(angle)
+    sin_angle = np.sin(angle)
+    return np.array([
+        [cos_angle, 0, sin_angle],
+        [0, 1, 0],
+        [-sin_angle, 0, cos_angle]
+    ])
+
+def rotation_matrix_z(angle):
+    """
+    Create a rotation matrix for rotating points around the z-axis.
+
+    Parameters:
+        - angle (float): The rotation angle in radians.
+
+    Returns:
+        - np.array: The rotation matrix.
+    """
+    cos_angle = np.cos(angle)
+    sin_angle = np.sin(angle)
+    return np.array([
+        [cos_angle, -sin_angle, 0],
+        [sin_angle, cos_angle, 0],
+        [0, 0, 1]
+    ])
+
+
 def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_folder, width, height, fps):
     """
     Makes an animation of just the tracked points.
@@ -498,17 +553,6 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
 
     ### Make animation: for each frame, project 3D points for both mice and box corners to 2D.
 
-    # Get the 2D plane.
-    plane = np.array([[1, 0, 0], [0, 1, 0]])
-
-    # Calculate the center of the bounding box.
-    center_x = (max_x + min_x) / 2
-    center_y = (max_y + min_y) / 2
-
-    # Calculate the translation needed to center the bounding box in the frame.
-    translation_x = width / 2 - center_x
-    translation_y = height / 2 - center_y
-
     # Create video writer.
     output_video_path = output_video_path = os.path.join(session_folder, "skeleton_video.mp4")
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
@@ -525,9 +569,33 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
         # Create mask for semi-transparent areas.
         mask = np.zeros((frame_size[1], frame_size[0], 3), dtype=np.uint8)
 
+        # Calculate the rotation angle for the current frame.
+        angle = 2 * np.pi * frame_num / num_frames
+
+        # Create the rotation matrices.
+        rot_matrix_x = rotation_matrix_x(angle)
+        rot_matrix_y = rotation_matrix_y(angle)
+        rot_matrix_z = rotation_matrix_z(angle)
+
+        # Combine the rotation matrices.
+        rot_matrix = np.dot(rot_matrix_z, np.dot(rot_matrix_y, rot_matrix_x))
+
+        # Define the 2D plane based on the rotation matrix.
+        plane = np.dot(rot_matrix, np.array([[1, 0, 0], [0, 1, 0]]).T).T
+
         # Project 3D points to 2D.
         black_2D = project_to_2d(black_3D_pose[frame_num], plane)
         white_2D = project_to_2d(white_3D_pose[frame_num], plane)
+
+        # Project corners to 2D.
+        corners_2D = project_to_2d(corners, plane)
+
+        # Calculate the center of the bounding box in 2D.
+        center_2D = np.mean(corners_2D, axis=0)
+
+        # Calculate the translation needed to center the bounding box in the frame.
+        translation_x = width / 2 - center_2D[0]
+        translation_y = height / 2 - center_2D[1]
 
         # Apply translation to center the points.
         black_2D[:, 0] += translation_x
@@ -535,8 +603,7 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
         white_2D[:, 0] += translation_x
         white_2D[:, 1] += translation_y
 
-        # Project corners to 2D and apply translation.
-        corners_2D = project_to_2d(corners, plane)
+        # Apply translation to corners.
         corners_2D[:, 0] += translation_x
         corners_2D[:, 1] += translation_y
 
@@ -557,7 +624,7 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
             cv2.fillPoly(mask, [pts], (128, 128, 128))
 
         # Blend the mask with the frame.
-        alpha = 0.5
+        alpha = 0.25
         cv2.addWeighted(mask, alpha, frame, 1 - alpha, 0, frame)
 
         # Draw points for mice.
