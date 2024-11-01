@@ -32,6 +32,7 @@ import h5py
 import time
 import subprocess
 import numpy as np
+import matplotlib.pyplot as plt
 
 ### Global variables.
 
@@ -428,7 +429,21 @@ def open_h5_file_with_retry(filepath, mode="r", retries=5, delay=2):
     raise OSError(f"\tFailed to open file {filepath} after {retries} attempts.")
 
 
-def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_folder):
+def project_to_2d(points, plane):
+    """
+    Helper function for the make_skeleton_video function that projects 3D points to 2D using a plane.
+
+    Parameters:
+        - points (np.array): 3D points [frames, points, x/y/z].
+        - plane (np.array): 2D plane [2, 3].
+
+    Returns:
+        - np.array: 2D points [frames, points, x/y].
+    """
+    return np.dot(points, plane.T)
+
+
+def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_folder, width, height, fps):
     """
     Makes an animation of just the tracked points.
 
@@ -436,22 +451,104 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
         - black_3D_pose_filepath (str): Path to the black mouse 3D pose h5 file.
         - white_3D_pose_filepath (str): Path to the white mouse 3D pose h5 file.
         - session_folder (str): Path to the session folder containing video folders for each camera.
+        - width (int): Width of the video.
+        - height (int): Height of the video.
+        - fps (int): Frames per second of the video.
 
     Returns:
         - None.
     """
 
-    ### Open the 3D pose files.
+    ### Open the 3D pose files [frames, instances, points, x/y/z].
 
-    black_3D_pose_file = open_h5_file_with_retry(black_3D_pose_filepath)
-    white_3D_pose_file = open_h5_file_with_retry(white_3D_pose_filepath)
+    # Open files.
+    black_3D_pose_file = open_h5_file_with_retry(black_3D_pose_filepath)["tracks"]
+    white_3D_pose_file = open_h5_file_with_retry(white_3D_pose_filepath)["tracks"]
 
-    ### Print their structure.
+    # Collapse the instance dimension (only 1 instance).
+    black_3D_pose = black_3D_pose_file[:, 0, :, :]
+    white_3D_pose = white_3D_pose_file[:, 0, :, :]
 
-    print("\tBlack 3D pose file structure:")
-    for key in black_3D_pose_file.keys():
-        print(key)
-        print(f"\t\t{key}: {black_3D_pose_file[key].shape}")
+    # Assert the 3D pose files are the same length.
+    assert black_3D_pose.shape[0] == white_3D_pose.shape[0], "Black and white mouse 3D pose files do not have the same number of frames."
+
+    ### Get max x, y, and z coordinate to draw a bounding box between all four corners.
+
+    # Get max x, y, and z coordinates.
+    max_x = max(np.max(black_3D_pose[:, :, 0]), np.max(white_3D_pose[:, :, 0]))
+    max_y = max(np.max(black_3D_pose[:, :, 1]), np.max(white_3D_pose[:, :, 1]))
+    max_z = max(np.max(black_3D_pose[:, :, 2]), np.max(white_3D_pose[:, :, 2]))
+
+    # Get min x, y, and z coordinates.
+    min_x = min(np.min(black_3D_pose[:, :, 0]), np.min(white_3D_pose[:, :, 0]))
+    min_y = min(np.min(black_3D_pose[:, :, 1]), np.min(white_3D_pose[:, :, 1]))
+    min_z = min(np.min(black_3D_pose[:, :, 2]), np.min(white_3D_pose[:, :, 2]))
+
+    # Get the corners of the bounding box.
+    corners = np.array([
+        [min_x, min_y, min_z],
+        [min_x, min_y, max_z],
+        [min_x, max_y, min_z],
+        [min_x, max_y, max_z],
+        [max_x, min_y, min_z],
+        [max_x, min_y, max_z],
+        [max_x, max_y, min_z],
+        [max_x, max_y, max_z]
+    ])
+
+    ### Make animation: for each frame, project 3D points for both mice and box corners to 2D.
+
+    # Get the 2D plane.
+    plane = np.array([[1, 0, 0], [0, 1, 0]])
+
+    # Project corners to 2D.
+    corners_2D = project_to_2d(corners, plane)
+
+    # Create video writer.
+    output_video_path = output_video_path = os.path.join(session_folder, "skeleton_video.mp4")
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    frame_size = (width, height)
+    out = cv2.VideoWriter(output_video_path, fourcc, fps, frame_size)
+    num_frames = black_3D_pose.shape[0]
+
+    # Loop through frames.
+    for frame_num in range(num_frames):
+
+        # Create blank image.
+        frame = np.ones((frame_size[1], frame_size[0], 3), dtype=np.uint8) * 255
+
+        # Project 3D points to 2D.
+        black_2D = project_to_2d(black_3D_pose[frame_num], plane)
+        white_2D = project_to_2d(white_3D_pose[frame_num], plane)
+
+        # Draw points for mice.
+        for point in black_2D:
+            x, y = int(point[0]), int(point[1])
+            cv2.circle(frame, (x, y), 5, (0, 0, 255), -1)  # Red for black mouse
+
+        for point in white_2D:
+            x, y = int(point[0]), int(point[1])
+            cv2.circle(frame, (x, y), 5, (255, 0, 0), -1)  # Blue for white mouse.
+
+        # Draw bounding box (corners in black, with gray lines connecting them).
+        for corner in corners_2D:
+            x, y = int(corner[0]), int(corner[1])
+            cv2.circle(frame, (x, y), 5, (0, 0, 0), -1)  # Black for corners.
+
+        # Draw lines connecting corners.
+        for i in range(0, 4):
+            cv2.line(frame, (corners_2D[i][0], corners_2D[i][1]), (corners_2D[i + 4][0], corners_2D[i + 4][1]), (128, 128, 128), 2)
+            if i < 4:
+                cv2.line(frame, (corners_2D[i][0], corners_2D[i][1]), (corners_2D[i + 1][0], corners_2D[i + 1][1]), (128, 128, 128), 2)
+                cv2.line(frame, (corners_2D[i][0], corners_2D[i][1]), (corners_2D[i + 3][0], corners_2D[i + 3][1]), (128, 128, 128), 2)
+
+        # Write frame to video.
+        out.write(frame)
+
+    # Release video.
+    out.release()
+
+    print(f"\tMade skeleton video: {output_video_path}")
 
 
 def make_video():
@@ -501,10 +598,20 @@ def make_video():
 
     ### Make a video of just the skeletons.
 
+    # Get paths to 3D files.
     black_3D_pose_filepath = os.path.join(SESSION_FOLDER, "black_triangulated.h5")
     white_3D_pose_filepath = os.path.join(SESSION_FOLDER, "white_triangulated.h5")
 
-    make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, SESSION_FOLDER)
+    # Get video information (width, height, fps) from the first video.
+    video_folder = os.listdir(SESSION_FOLDER)[0]
+    video_path = os.path.join(SESSION_FOLDER, video_folder, [f for f in os.listdir(os.path.join(SESSION_FOLDER, video_folder)) if f.endswith(".mp4")][0])
+    cap = cv2.VideoCapture(video_path)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
+
+    # Make the skeleton video.
+    make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, SESSION_FOLDER, width, height, fps)
 
     print("\tMade skeleton videos.")
 

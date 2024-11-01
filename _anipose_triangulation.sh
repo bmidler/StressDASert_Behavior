@@ -19,7 +19,7 @@ calibration_file=$2
 output_filename=$3
 
 # Run triangulation.
-slap-triangulate --p2d $session_directory --calib $calibration_file --fname $output_filename --scale_smooth 1
+slap-triangulate --p2d $session_directory --calib $calibration_file --fname $output_filename --scale_smooth 1 --n_deriv_smooth 2
 
 # Reproject to each view.
 reprojection_filename="${output_filename%.*}_reprojected.h5"

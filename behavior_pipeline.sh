@@ -11,7 +11,7 @@
 #SBATCH --output=SBATCH_outputs/behavior_pipeline_output.txt
 
 module load anacondapy/2023.07-cuda
-source activate sleap
+source activate general
 echo "Starting behavior pipeline."
 echo "Current conda environment: $(conda info --envs | grep '*' | awk '{print $1}')"
 

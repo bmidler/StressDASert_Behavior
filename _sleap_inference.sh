@@ -9,7 +9,8 @@
 #SBATCH -t 04:00:00
 
 module load anacondapy/2023.07-cuda
-source activate sleap
+eval "$(conda shell.bash hook)"
+conda activate sleap
 
 # Print job, TF, and GPU information.
 echo "Current conda environment: $(conda info --envs | grep '*' | awk '{print $1}')"
