@@ -20,7 +20,6 @@ NOTE: needs to be in same directory as sbatch scripts for inference and triangul
 NOTE: run this pythoon script via the behavior_pipeline.sh sbatch script.
 
 TODO:
-- Make video of just the tracked points.
 - Make demo video comparing video with reprojected points to original inference.
 """
 
@@ -615,28 +614,34 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
         # Create a blank mask for counting overlaps.
         overlap_mask = np.zeros((frame_size[1], frame_size[0]), dtype=np.uint8)
 
+        # Define shading values for walls and floor.
+        wall_shade = 50 # Lighter.
+        floor_shade = 150 # Darker.
+
         # Fill polygons on the mask and count overlaps.
         for i, polygon in enumerate(polygons):
+
             # Create a temporary mask for the current polygon.
             temp_mask = np.zeros((frame_size[1], frame_size[0]), dtype=np.uint8)
             cv2.fillPoly(temp_mask, [np.array(polygon, np.int32)], 1)
 
-            # Add the temporary mask to the overlap mask.
+            # Determine the shade to apply.
+            if i < 4:  # Walls
+                temp_mask = (temp_mask * wall_shade)
+            else:  # Floor
+                temp_mask = (temp_mask * floor_shade)
+
+            # Add the temporary mask to the overlap mask (lower values are darker).
             overlap_mask = cv2.add(overlap_mask, temp_mask)
 
         # Normalize the overlap mask to the range [0, 255].
-        max_overlaps = len(polygons)
-        shading_scale = 255 // max_overlaps
-        shaded_mask = overlap_mask * shading_scale
+        shaded_mask = np.clip(overlap_mask, 0, 255)
 
         # Convert the shaded mask to a 3-channel image.
-        shaded_mask_3ch = 255 - cv2.merge([shaded_mask, shaded_mask, shaded_mask]) # Need to invert the mask (higher values are lighter).
-
-        # Set corresponding indices in the frame to 0 before adding the shaded mask (prevents saturation).
-        frame[shaded_mask_3ch > 0] = 0
+        shaded_mask_3ch = cv2.merge([shaded_mask, shaded_mask, shaded_mask])
 
         # Blend the shaded mask with the frame using additive blending.
-        frame = cv2.add(frame, shaded_mask_3ch)
+        frame = cv2.subtract(frame, shaded_mask_3ch)
 
         # Draw points for mice.
         for point in black_2D:
