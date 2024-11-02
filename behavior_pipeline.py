@@ -21,6 +21,7 @@ NOTE: run this pythoon script via the behavior_pipeline.sh sbatch script.
 
 TODO:
 - Make demo video comparing video with reprojected points to original inference.
+- Find a better way to mark corners of bounding box (using only Bl6 nose location??? or just not have at all). Also make the rotation better. Mayber fixed z elevation and rotate around x.
 """
 
 ### Import statements.
@@ -709,8 +710,7 @@ def make_video():
         # Make the video for the current camera view.
         camera_directory = os.path.join(SESSION_FOLDER, camera_view)
         camera_filepath = [f for f in os.listdir(camera_directory) if f.endswith(".mp4")][0]
-        # TODO: uncomment this.
-        # make_single_video(os.path.join(camera_directory, camera_filepath), black_camera_tracks, white_camera_tracks, os.path.join(camera_directory, f"{camera_view}_tracks"))
+        make_single_video(os.path.join(camera_directory, camera_filepath), black_camera_tracks, white_camera_tracks, os.path.join(camera_directory, f"{camera_view}_tracks"))
 
     # Close the HDF5 files
     black_reprojection_tracks_file.close()
@@ -740,8 +740,6 @@ def make_video():
 
 
 def main():
-
-    """
 
     ### Check if there is a folder for SBATCH outputs. Make if not.
 
@@ -787,8 +785,6 @@ def main():
     run_anipose_triangulation()
 
     ### Make video of the tracks if specified.
-
-    """
 
     if MAKE_VIDEO:
 

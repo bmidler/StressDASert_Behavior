@@ -4,7 +4,7 @@
 #SBATCH -p all
 
 #SBATCH -c 7
-#SBATCH --mem=200GB
+#SBATCH --mem=220GB
 #SBATCH --gpus=1
 #SBATCH -t 04:00:00
 
@@ -26,8 +26,7 @@ tracks_file_path=$4
 output_filename="${mouse_color}_inference.h5"
 
 # Run sleap inference.
-# NOTE: delete --frames flag after testing is done.
-sleap-track -o $tracks_file_path --frames 0-5000 --tracking.tracker flow --peak_threshold 0.3 --tracking.track_window 3 --tracking.post_connect_single_breaks 1 --tracking.similarity instance --tracking.clean_instance_count 1 --model $centroid_model --model  $centered_model $video
+sleap-track -o $tracks_file_path --tracking.tracker flow --peak_threshold 0.3 --tracking.track_window 3 --tracking.post_connect_single_breaks 1 --tracking.similarity instance --tracking.clean_instance_count 1 --model $centroid_model --model  $centered_model $video
 
 # Convert slp file to h5 (for anipose).
 h5_file_path="${tracks_file_path%.slp}.h5"
