@@ -4,7 +4,7 @@
 #SBATCH -p all
 
 #SBATCH -c 7
-#SBATCH --mem=220GB
+#SBATCH --mem=250GB
 #SBATCH --gpus=1
 #SBATCH -t 04:00:00
 

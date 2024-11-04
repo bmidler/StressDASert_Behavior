@@ -377,10 +377,10 @@ def make_single_video(video_path, black_tracks, white_tracks, fname):
             # Overlay the tracks on the frame, blue for white mouse, red for black mouse.
             for i in range(black_frame_tracks.shape[0]):
                 x, y = int(black_frame_tracks[i, 0]), int(black_frame_tracks[i, 1])
-                cv2.circle(frame, (x, y), 5, (0, 0, 255), -1)
+                cv2.circle(frame, (x, y), 4, (0, 0, 255), -1)
             for i in range(white_frame_tracks.shape[0]):
                 x, y = int(white_frame_tracks[i, 0]), int(white_frame_tracks[i, 1])
-                cv2.circle(frame, (x, y), 5, (255, 0, 0), -1)
+                cv2.circle(frame, (x, y), 4, (255, 0, 0), -1)
     
             # Write the frame to the output video.
             out.write(frame)
@@ -527,14 +527,14 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
     ### Get max x, y, and z coordinate to draw a bounding box between all four corners.
 
     # Get max x, y, and z coordinates--only from black mouse for now as its tracking is more stable.
-    max_x = max(np.max(black_3D_pose[:, :, 0]))
-    max_y = max(np.max(black_3D_pose[:, :, 1]))
-    max_z = max(np.max(black_3D_pose[:, :, 2]))
+    max_x = np.max(black_3D_pose[:, :, 0])
+    max_y = np.max(black_3D_pose[:, :, 1])
+    max_z = np.max(black_3D_pose[:, :, 2])
 
     # Get min x, y, and z coordinates--only from black mouse for now as its tracking is more stable.
-    min_x = min(np.min(black_3D_pose[:, :, 0]))
-    min_y = min(np.min(black_3D_pose[:, :, 1]))
-    min_z = min(np.min(black_3D_pose[:, :, 2]))
+    min_x = np.min(black_3D_pose[:, :, 0])
+    min_y = np.min(black_3D_pose[:, :, 1])
+    min_z = np.min(black_3D_pose[:, :, 2])
 
     # Get the corners of the bounding box.
     corners = np.array([
@@ -563,8 +563,10 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
         # Create blank image.
         frame = np.ones((frame_size[1], frame_size[0], 3), dtype=np.uint8) * 255
 
-        # Calculate the rotation angle for the current frame.
-        angle = 2 * np.pi * frame_num / num_frames
+        # Rotation parameters.
+        rotation_speed = np.pi / 12
+        elapsed_time = frame_num / fps
+        angle = rotation_speed * elapsed_time
 
         # Create the rotation matrices.
         rot_matrix_x = rotation_matrix_x(angle)
@@ -580,8 +582,6 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
         # Project 3D points to 2D.
         black_2D = project_to_2d(black_3D_pose[frame_num], plane)
         white_2D = project_to_2d(white_3D_pose[frame_num], plane)
-
-        # Project corners to 2D.
         corners_2D = project_to_2d(corners, plane)
 
         # Calculate the center of the bounding box in 2D.
@@ -644,11 +644,11 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
         # Draw points for mice.
         for point in black_2D:
             x, y = int(point[0]), int(point[1])
-            cv2.circle(frame, (x, y), 5, (0, 0, 255), -1)  # Red for black mouse.
+            cv2.circle(frame, (x, y), 4, (0, 0, 255), -1)  # Red for black mouse.
 
         for point in white_2D:
             x, y = int(point[0]), int(point[1])
-            cv2.circle(frame, (x, y), 5, (255, 0, 0), -1)  # Blue for white mouse.
+            cv2.circle(frame, (x, y), 4, (255, 0, 0), -1)  # Blue for white mouse.
 
         # Draw bounding box corners in black.
         for corner in corners_2D:
@@ -656,7 +656,7 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
             cv2.circle(frame, (x, y), 10, (0, 0, 0), -1)  # Black for corners.
 
         # Using the 3D coordinates of the box corners, draw lines between adjacent (sharing at least one x, y, or z coordinate) corners.
-        for i in range(8):
+        for i in range(8): # Eight for the number of corners.
             for j in range(8): # Will be some redundant drawing.
                 if np.sum(np.abs(corners[i] - corners[j])) == max(np.abs(corners[i] - corners[j])):
                     cv2.line(frame, (int(corners_2D[i][0]), int(corners_2D[i][1])), (int(corners_2D[j][0]), int(corners_2D[j][1])), (0, 0, 0), 2)
@@ -713,7 +713,7 @@ def make_video():
     black_reprojection_tracks_file.close()
     white_reprojection_tracks_file.close()
 
-    print("\tMade tracked point videos.")
+    print("\tTracked point videos done, now making skeleton video.")
 
     ### Make a video of just the skeletons.
 
