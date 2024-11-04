@@ -16,9 +16,6 @@ Does the following:
     - Re-projects poses back to each camera view based on homogenized 3D pose.
     - Outputs video of the tracks.
 
-NOTE: needs to be in same directory as sbatch scripts for inference and triangulation.
-NOTE: run this pythoon script via the behavior_pipeline.sh sbatch script.
-
 TODO:
 - Make demo video comparing video with reprojected points to original inference.
 - Find a better way to mark corners of bounding box (using only Bl6 nose location??? or just not have at all). Also make the rotation better. Mayber fixed z elevation and rotate around x.
@@ -529,15 +526,15 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
 
     ### Get max x, y, and z coordinate to draw a bounding box between all four corners.
 
-    # Get max x, y, and z coordinates.
-    max_x = max(np.max(black_3D_pose[:, :, 0]), np.max(white_3D_pose[:, :, 0]))
-    max_y = max(np.max(black_3D_pose[:, :, 1]), np.max(white_3D_pose[:, :, 1]))
-    max_z = max(np.max(black_3D_pose[:, :, 2]), np.max(white_3D_pose[:, :, 2]))
+    # Get max x, y, and z coordinates--only from black mouse for now as its tracking is more stable.
+    max_x = max(np.max(black_3D_pose[:, :, 0]))
+    max_y = max(np.max(black_3D_pose[:, :, 1]))
+    max_z = max(np.max(black_3D_pose[:, :, 2]))
 
-    # Get min x, y, and z coordinates.
-    min_x = min(np.min(black_3D_pose[:, :, 0]), np.min(white_3D_pose[:, :, 0]))
-    min_y = min(np.min(black_3D_pose[:, :, 1]), np.min(white_3D_pose[:, :, 1]))
-    min_z = min(np.min(black_3D_pose[:, :, 2]), np.min(white_3D_pose[:, :, 2]))
+    # Get min x, y, and z coordinates--only from black mouse for now as its tracking is more stable.
+    min_x = min(np.min(black_3D_pose[:, :, 0]))
+    min_y = min(np.min(black_3D_pose[:, :, 1]))
+    min_z = min(np.min(black_3D_pose[:, :, 2]))
 
     # Get the corners of the bounding box.
     corners = np.array([
