@@ -4,7 +4,7 @@
 #SBATCH -p all
 
 #SBATCH -c 1
-#SBATCH --mem=8GB
+#SBATCH --mem=32GB
 #SBATCH -t 01:00:00
 
 module load anacondapy/2023.07-cuda
