@@ -15,10 +15,6 @@ Does the following:
     - Triangulates unified 3D pose based on pose tracking for each camera view in the session.
     - Re-projects poses back to each camera view based on homogenized 3D pose.
     - Outputs video of the tracks.
-
-TODO:
-- Make demo video comparing video with reprojected points to original inference.
-- Find a better way to mark corners of bounding box (using only Bl6 nose location??? or just not have at all). Also make the rotation better. Mayber fixed z elevation and rotate around x.
 """
 
 ### Import statements.
