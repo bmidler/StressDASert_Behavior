@@ -5,7 +5,7 @@
 
 #SBATCH -c 1
 #SBATCH --mem=32GB
-#SBATCH -t 04:00:00
+#SBATCH -t 12:00:00
 
 #SBATCH --error=SBATCH_outputs/behavior_pipeline_error.txt
 #SBATCH --output=SBATCH_outputs/behavior_pipeline_output.txt

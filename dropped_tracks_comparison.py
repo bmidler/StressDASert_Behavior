@@ -115,7 +115,7 @@ def main():
     ax.legend()
 
     # Save the figure.
-    fig.savefig(os.path.join(OUTPUT, "frame_tracking_success.png", dpi=300))
+    fig.savefig(os.path.join(OUTPUT, "frame_tracking_success.png"), dpi=300)
 
 
 if __name__ == "__main__":

@@ -18,8 +18,8 @@ session_directory=$1
 calibration_file=$2
 output_filename=$3
 
-# Run triangulation: no smoothing, 10 pixel error threshold, l2 loss.
-slap-triangulate --p2d $session_directory --calib $calibration_file --fname $output_filename --scale_smooth 0 --n_deriv_smooth 2 --reproj_loss l2 --reproj_error_threshold 10
+# Run triangulation: smoothing=1, 10 pixel error threshold, l2 loss.
+slap-triangulate --p2d $session_directory --calib $calibration_file --fname $output_filename --scale_smooth 1 --n_deriv_smooth 2 --reproj_loss l2 --reproj_error_threshold 10
 
 # Reproject to each view.
 reprojection_filename="${output_filename%.*}_reprojected.h5"
