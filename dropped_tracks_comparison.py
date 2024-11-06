@@ -90,32 +90,44 @@ def main():
     # For the original tracks.
     original_tracks_frame_success_vector = []
     for original_track in original_camera_view_tracks:
-        tracker = np.all(~np.isnan(original_track), axis=(0, 1))
+        tracker = np.all(~np.isnan(original_track.T), axis=(0, 1)) # Dropped track is a nan.
         original_tracks_frame_success_vector.append(tracker)
     original_tracks_frame_success_vector = np.array(original_tracks_frame_success_vector)
 
     # For the 3D tracks.
-    tracker_3D_frame_success_vector = np.all(~np.isnan(tracks_3D), axis=(0, 1, 2))
+    tracker_3D_frame_success_vector = np.all(~np.isnan(tracks_3D), axis=(1, 2)) # Dropped track is a nan.
 
     ### Make the figure: raster of frame success for each camera view and 3D tracks.
 
-    fig, ax = plt.subplots(1, 1, figsize=(10, 5))
+    n = original_tracks_frame_success_vector.shape[0]
 
-    # Plot the original tracks.
-    for i, tracker in enumerate(original_tracks_frame_success_vector):
-        ax.plot(tracker + i, color="black", label=f"Camera {i+1}")
+    # Combine the vectors into a single array
+    combined_success_vector = np.vstack((original_tracks_frame_success_vector, tracker_3D_frame_success_vector))
 
-    # Plot the 3D tracks.
-    ax.plot(tracker_3D_frame_success_vector + len(original_tracks_frame_success_vector), color="blue", label="3D")
+    # Create figure and axis
+    fig, ax = plt.subplots(figsize=(10, 5))
 
-    # Set the labels.
+    # Use imshow to display the raster plot
+    cax = ax.imshow(combined_success_vector, aspect="auto", cmap="Greys", interpolation="none")
+
+    # Set y-ticks and labels
+    ax.set_yticks(range(n + 1))
+    ax.set_yticklabels([f"Camera {i}" for i in range(n)] + ["3D Pose"])
+
+    # Calculate percentage of frames correctly tracked
+    percent_correct = 100 * np.mean(combined_success_vector, axis=1)
+
+    # Create a secondary y-axis
+    ax2 = ax.twinx()
+    ax2.set_yticks(range(n + 1))
+    ax2.set_yticklabels([f'{p:.1f}%' for p in percent_correct])
+    ax2.set_ylim(ax.get_ylim())
+
+    # Set labels
     ax.set_xlabel("Frame")
-    ax.set_ylabel("Success")
-    ax.set_title("Frame Tracking Success")
-    ax.legend()
+    ax.set_title("Frame tracking (0 failures)")
 
-    # Save the figure.
-    fig.savefig(os.path.join(OUTPUT, "frame_tracking_success.png"), dpi=300)
+    plt.savefig(os.path.join(OUTPUT, "dropped_tracks_comparison.png"), dpi=300)
 
 
 if __name__ == "__main__":
