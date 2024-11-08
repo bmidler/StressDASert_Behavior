@@ -34,14 +34,15 @@ BLACK_COLOR = "red"
 WHITE_COLOR = "blue"
 
 FILENAME_PREFIX = "/mnt/cup/labs/witten/"
-SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-25/Bl6SW_2/[2024-09-25_13-43-44]-SleapTrain_Bl6SW_2"
+SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-25/Bl6SW_3/[2024-09-25_14-00-35]-SleapTrain_Bl6SW_3"
+SESSION_NAME = SESSION_FOLDER.split("/")[-1]
 CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/FineTuned_241025_175234.centroid.n=717"
 CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/FineTuned_241027_112222.centered_instance.n=717"
 CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Baselines/SW/models/SW_centroid_v1/240927_195723.centroid.n=216"
 CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Baselines/SW/models/SW_centered_v1/240927_200825.centered_instance.n=216"
-ANIPOSE_CALIBRATION_FILE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-25/Bl6SW_2/[2024-09-25_13-43-44]-SleapTrain_Bl6SW_2/calibration-2024-09-25.toml"
-INFERENCE_SBATCH_SCRIPT = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Scripts/_sleap_inference.sh"
-ANIPOSE_TRIANGULATION_SBATCH_SCRIPT = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Scripts/_anipose_triangulation.sh"
+ANIPOSE_CALIBRATION_FILE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-25/Bl6SW_3/[2024-09-25_14-00-35]-SleapTrain_Bl6SW_3/calibration-2024-09-25.toml"
+INFERENCE_SBATCH_SCRIPT = os.path.join(FILENAME_PREFIX, os.getcwd(), "_sleap_inference.sh")
+ANIPOSE_TRIANGULATION_SBATCH_SCRIPT = os.path.join(FILENAME_PREFIX, os.getcwd(), "_anipose_triangulation.sh")
 
 ### Function definitions.
 
@@ -103,7 +104,7 @@ def run_sleap_inference(session_folder, centroid_model, centered_model, mouse_co
 
         # Construct the command to run the SBATCH script with dynamic error and output file paths.
         command = (
-            f"sbatch --error=SBATCH_outputs/{error_file} --output=SBATCH_outputs/{output_file} "
+            f"sbatch --error=SBATCH_outputs/{SESSION_NAME}/{error_file} --output=SBATCH_outputs/{SESSION_NAME}/{output_file} "
             f"{INFERENCE_SBATCH_SCRIPT} {video_path} {centroid_model} {centered_model} {relative_tracks_file_path}"
         )
 
@@ -208,8 +209,8 @@ def run_anipose_triangulation():
     session_directory = SESSION_FOLDER
     calibration_file = ANIPOSE_CALIBRATION_FILE
     output_filename = session_directory + "/" + "black_triangulated.h5"
-    error_file = "SBATCH_outputs/black_triangulation_errors.txt"
-    output_file = "SBATCH_outputs/black_triangulation_outputs.txt"
+    error_file = f"SBATCH_outputs/{SESSION_NAME}/black_triangulation_errors.txt"
+    output_file = f"SBATCH_outputs/{SESSION_NAME}/black_triangulation_outputs.txt"
     command = (f"sbatch --error={error_file} --output={output_file} {ANIPOSE_TRIANGULATION_SBATCH_SCRIPT} {session_directory} {calibration_file} {output_filename}")
 
     # Run the command and capture the output and errors.
@@ -254,8 +255,8 @@ def run_anipose_triangulation():
     session_directory = SESSION_FOLDER
     calibration_file = ANIPOSE_CALIBRATION_FILE
     output_filename = session_directory + "/" + "white_triangulated.h5"
-    error_file = "SBATCH_outputs/white_triangulation_errors.txt"
-    output_file = "SBATCH_outputs/white_triangulation_outputs.txt"
+    error_file = f"SBATCH_outputs/{SESSION_NAME}/white_triangulation_errors.txt"
+    output_file = f"SBATCH_outputs/{SESSION_NAME}/white_triangulation_outputs.txt"
     command = (f"sbatch --error={error_file} --output={output_file} {ANIPOSE_TRIANGULATION_SBATCH_SCRIPT} {session_directory} {calibration_file} {output_filename}")
 
     # Run the command and capture the output and errors.
@@ -736,8 +737,10 @@ def main():
 
     ### Check if there is a folder for SBATCH outputs. Make if not.
 
-    if not os.path.exists("SBATCH_outputs"):  # Check if the output folder exists.
-        os.makedirs("SBATCH_outputs")  # Create the output folder.
+    if not os.path.exists(os.path.join("SBATCH_outputs", SESSION_NAME)):  # Check if the output folder exists.
+        os.makedirs(os.path.join("SBATCH_outputs", SESSION_NAME))  # Create the output folder.
+
+    print(f"Running pipeline for session: {SESSION_NAME}")
 
     ### Run check to make sure the global variable files and SBATCH script exist.
 

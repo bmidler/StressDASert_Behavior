@@ -7,8 +7,8 @@
 #SBATCH --mem=32GB
 #SBATCH -t 12:00:00
 
-#SBATCH --error=SBATCH_outputs/behavior_pipeline_error.txt
-#SBATCH --output=SBATCH_outputs/behavior_pipeline_output.txt
+#SBATCH --error=SBATCH_outputs/behavior_pipeline_error_%j_%x_%A_%a_%N_%t.txt
+#SBATCH --output=SBATCH_outputs/behavior_pipeline_output_%j_%x_%A_%a_%N_%t.txt
 
 module load anacondapy/2023.07-cuda
 source activate general

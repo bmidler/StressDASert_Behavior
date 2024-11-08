@@ -125,7 +125,7 @@ def main():
 
     # Set labels
     ax.set_xlabel("Frame")
-    ax.set_title("Frame tracking (0 failures)")
+    ax.set_title("Frame tracking (no failures)")
 
     plt.savefig(os.path.join(OUTPUT, "dropped_tracks_comparison.png"), dpi=300)
 
