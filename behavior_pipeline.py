@@ -32,7 +32,7 @@ import matplotlib.pyplot as plt
 MAKE_VIDEO = True
 
 FILENAME_PREFIX = "/mnt/cup/labs/witten/"
-SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-27/Bl6SW_5/[2024-09-27_12-53-39]-Bl6SW_5"
+SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-27/Bl6SW_7/[2024-09-27_13-16-02]-Bl6SW_7"
 SESSION_NAME = SESSION_FOLDER.split("/")[-1]
 CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/FineTuned_241025_175234.centroid.n=717"
 CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/FineTuned_241027_112222.centered_instance.n=717"
@@ -703,10 +703,11 @@ def make_video():
         camera_directory = os.path.join(SESSION_FOLDER, camera_view)
         camera_filepath = [f for f in os.listdir(camera_directory) if f.endswith(".mp4")][0]
 
+        # Try making single video and grab the error if there is one.
         try:
-            make_single_video(os.path.join(camera_directory, camera_filepath), black_camera_tracks, white_camera_tracks, os.path.join(camera_directory, f"{camera_view}_tracks"))
-        except:
-            print(f"\tError making video for camera view {i + 1} of {len(camera_views)}.")
+            make_single_video(os.path.join(camera_directory, camera_filepath), black_camera_tracks, white_camera_tracks, os.path.join(camera_directory, "tracked_video"))
+        except Exception as e:
+            print(f"\tError making video for camera view {camera_view}: {e}")
 
     # Close the HDF5 files
     black_reprojection_tracks_file.close()
@@ -729,11 +730,11 @@ def make_video():
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
     fps = cap.get(cv2.CAP_PROP_FPS)
 
-    # Make the skeleton video.
+    # Try making the skeleton video and grab the error if there is one.
     try:
         make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, SESSION_FOLDER, width, height, fps)
-    except:
-        print("\tError making skeleton video.")
+    except Exception as e:
+        print(f"\tError making skeleton video: {e}")
 
     print("\tMade skeleton videos.")
 
