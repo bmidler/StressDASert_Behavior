@@ -30,17 +30,15 @@ import matplotlib.pyplot as plt
 ### Global variables.
 
 MAKE_VIDEO = True
-BLACK_COLOR = "red"
-WHITE_COLOR = "blue"
 
 FILENAME_PREFIX = "/mnt/cup/labs/witten/"
-SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-25/Bl6SW_3/[2024-09-25_14-00-35]-SleapTrain_Bl6SW_3"
+SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-27/Bl6SW_5/[2024-09-27_12-53-39]-Bl6SW_5"
 SESSION_NAME = SESSION_FOLDER.split("/")[-1]
 CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/FineTuned_241025_175234.centroid.n=717"
 CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/FineTuned_241027_112222.centered_instance.n=717"
-CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Baselines/SW/models/SW_centroid_v1/240927_195723.centroid.n=216"
-CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Baselines/SW/models/SW_centered_v1/240927_200825.centered_instance.n=216"
-ANIPOSE_CALIBRATION_FILE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-25/Bl6SW_3/[2024-09-25_14-00-35]-SleapTrain_Bl6SW_3/calibration-2024-09-25.toml"
+CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Projects/SW/models/241112_171222.centroid.n=308"
+CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Projects/SW/models/241112_195041.centered_instance.n=308"
+ANIPOSE_CALIBRATION_FILE = SESSION_FOLDER + "/calibration-2024-09-27.toml"
 INFERENCE_SBATCH_SCRIPT = os.path.join(FILENAME_PREFIX, os.getcwd(), "_sleap_inference.sh")
 ANIPOSE_TRIANGULATION_SBATCH_SCRIPT = os.path.join(FILENAME_PREFIX, os.getcwd(), "_anipose_triangulation.sh")
 
@@ -395,7 +393,7 @@ def make_single_video(video_path, black_tracks, white_tracks, fname):
     out.release()
 
 
-def open_h5_file_with_retry(filepath, mode="r", retries=5, delay=2):
+def open_h5_file_with_retry(filepath, mode="r", retries=100, delay=2):
     """
     Attempts to open and return an h5 file, but retries if the file is locked (eg.g another process is accessing it).
     Fixes an issue where the h5 reprojection files are locked by the anipose process.
@@ -704,7 +702,11 @@ def make_video():
         # Make the video for the current camera view.
         camera_directory = os.path.join(SESSION_FOLDER, camera_view)
         camera_filepath = [f for f in os.listdir(camera_directory) if f.endswith(".mp4")][0]
-        make_single_video(os.path.join(camera_directory, camera_filepath), black_camera_tracks, white_camera_tracks, os.path.join(camera_directory, f"{camera_view}_tracks"))
+
+        try:
+            make_single_video(os.path.join(camera_directory, camera_filepath), black_camera_tracks, white_camera_tracks, os.path.join(camera_directory, f"{camera_view}_tracks"))
+        except:
+            print(f"\tError making video for camera view {i + 1} of {len(camera_views)}.")
 
     # Close the HDF5 files
     black_reprojection_tracks_file.close()
@@ -728,7 +730,10 @@ def make_video():
     fps = cap.get(cv2.CAP_PROP_FPS)
 
     # Make the skeleton video.
-    make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, SESSION_FOLDER, width, height, fps)
+    try:
+        make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, SESSION_FOLDER, width, height, fps)
+    except:
+        print("\tError making skeleton video.")
 
     print("\tMade skeleton videos.")
 
