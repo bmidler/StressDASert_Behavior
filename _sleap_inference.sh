@@ -12,9 +12,20 @@ module load anacondapy/2023.07-cuda
 eval "$(conda shell.bash hook)"
 conda activate sleap
 
+# Set the environment variable for TensorFlow GPU allocator
+export TF_GPU_ALLOCATOR=cuda_malloc_async
+
 # Print job, TF, and GPU information.
 echo "Current conda environment: $(conda info --envs | grep '*' | awk '{print $1}')"
-python -c "import tensorflow as tf; print('TensorFlow version:', tf.__version__); print('GPU devices:', tf.config.list_physical_devices('GPU'))"
+python -c "
+import tensorflow as tf
+print('TensorFlow version:', tf.__version__)
+print('GPU devices:', tf.config.list_physical_devices('GPU'))
+# Enable memory growth for the GPU
+gpus = tf.config.experimental.list_physical_devices('GPU')
+for gpu in gpus:
+    tf.config.experimental.set_memory_growth(gpu, True)
+"
 
 # Variables passed as command line arguments.
 video=$1
@@ -26,7 +37,7 @@ tracks_file_path=$4
 output_filename="${mouse_color}_inference.h5"
 
 # Run sleap inference.
-sleap-track -o $tracks_file_path --tracking.tracker flow --peak_threshold 0.3 --tracking.track_window 3 --tracking.post_connect_single_breaks 1 --tracking.similarity instance --tracking.clean_instance_count 1 --model $centroid_model --model  $centered_model $video
+sleap-track -o $tracks_file_path --batch_size 8 --gpu "auto" --tracking.tracker simple --peak_threshold 0.3 --tracking.track_window 3 --tracking.post_connect_single_breaks 1 --tracking.similarity instance --tracking.clean_instance_count 1 --model $centroid_model --model  $centered_model $video
 
 # Convert slp file to h5 (for anipose).
 h5_file_path="${tracks_file_path%.slp}.h5"

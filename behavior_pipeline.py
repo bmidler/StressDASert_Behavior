@@ -32,7 +32,7 @@ import matplotlib.pyplot as plt
 MAKE_VIDEO = True
 
 FILENAME_PREFIX = "/mnt/cup/labs/witten/"
-SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-27/Bl6SW_7/[2024-09-27_13-16-02]-Bl6SW_7"
+SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/gilliam-demo/20-11-2024" # "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-25/Bl6SW_4/[2024-09-25_14-26-59]-SleapTrain_Bl6SW_4"
 SESSION_NAME = SESSION_FOLDER.split("/")[-1]
 CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/FineTuned_241025_175234.centroid.n=717"
 CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/FineTuned_241027_112222.centered_instance.n=717"
@@ -228,7 +228,13 @@ def run_anipose_triangulation():
             job_id = output.split()[-1]
 
     print(f"\tRunning triangulation/reprojection for black mouse (Job ID: {job_id})")
-    time.sleep(15)  # Wait for the triangulation to finish.
+
+    # Wait until the subprocess is done.
+    while True:
+        if not os.path.exists(output_filename):
+            time.sleep(10)
+        else:
+            break
 
     # Move white mouse inference files back to their original locations.
     for folder in video_folders:
@@ -274,7 +280,13 @@ def run_anipose_triangulation():
             job_id = output.split()[-1]
 
     print(f"\tRunning triangulation/reprojection for white mouse (Job ID: {job_id})")
-    time.sleep(15)  # Wait for the triangulation to finish.
+    
+    # Wait until the subprocess is done.
+    while True:
+        if not os.path.exists(output_filename):
+            time.sleep(10)
+        else:
+            break
 
     # Move black mouse inference files back to their original locations.
     for folder in video_folders:

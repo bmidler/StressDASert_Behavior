@@ -4,8 +4,8 @@
 #SBATCH -p all
 
 #SBATCH -c 1
-#SBATCH --mem=32GB
-#SBATCH -t 01:00:00
+#SBATCH --mem=100GB
+#SBATCH -t 02:00:00
 
 module load anacondapy/2023.07-cuda
 eval "$(conda shell.bash hook)"
