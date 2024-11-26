@@ -32,13 +32,13 @@ import matplotlib.pyplot as plt
 MAKE_VIDEO = True
 
 FILENAME_PREFIX = "/mnt/cup/labs/witten/"
-SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/gilliam-demo/20-11-2024" # "Ben/Projects/StressDASert/Behavior/Data/SleapTrainVideos/2024-09-25/Bl6SW_4/[2024-09-25_14-26-59]-SleapTrain_Bl6SW_4"
+SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/gilliam-demo/26-11-2024/864_SW"
 SESSION_NAME = SESSION_FOLDER.split("/")[-1]
 CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/FineTuned_241025_175234.centroid.n=717"
 CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/FineTuned_241027_112222.centered_instance.n=717"
 CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Projects/SW/models/241112_171222.centroid.n=308"
 CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Projects/SW/models/241112_195041.centered_instance.n=308"
-ANIPOSE_CALIBRATION_FILE = SESSION_FOLDER + "/calibration-2024-09-27.toml"
+ANIPOSE_CALIBRATION_FILE = SESSION_FOLDER + "/calibration-26-11-2024.toml"
 INFERENCE_SBATCH_SCRIPT = os.path.join(FILENAME_PREFIX, os.getcwd(), "_sleap_inference.sh")
 ANIPOSE_TRIANGULATION_SBATCH_SCRIPT = os.path.join(FILENAME_PREFIX, os.getcwd(), "_anipose_triangulation.sh")
 
