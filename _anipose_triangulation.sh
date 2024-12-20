@@ -30,7 +30,7 @@ success=0
 echo "Starting triangulation..."
 
 while [ $retry_count -lt $max_retries ]; do
-    slap-triangulate --p2d $session_directory --calib $calibration_file --fname $output_filename --scale_smooth 1 --n_deriv_smooth 2 --reproj_loss l2 --reproj_error_threshold 15
+    slap-triangulate --p2d $session_directory --calib $calibration_file --fname $output_filename --scale_smooth 2 --n_deriv_smooth 2 --reproj_loss l2 --reproj_error_threshold 15
     if [ $? -eq 0 ]; then
         success=1
         echo "slap-triangulate succeeded after $retry_count retries."
