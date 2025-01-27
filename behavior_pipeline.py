@@ -30,18 +30,24 @@ import matplotlib.pyplot as plt
 ### Global variables.
 
 MAKE_VIDEO = True
-
 FILENAME_PREFIX = "/mnt/cup/labs/witten/"
-SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/Troubleshooting/17-12-2024/ID6_Pwr30_Fps80"
-SESSION_NAME = SESSION_FOLDER.split("/")[-1]
-CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/241218_171002.centroid.n=842"
-CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/241218_193932.centered_instance.n=842"
+
+# Models.
+SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/Troubleshooting/15-1-2025/Troubleshooting_GCaMP2_15-1-2025_v3"
+CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/250125_171608.centroid.n=1494"
+CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/250125_211111.centered_instance.n=1494"
 CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/241212_180150.centroid.n=1002"
 CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/241212_214808.centered_instance.n=1002"
-ANIPOSE_CALIBRATION_FILE = SESSION_FOLDER + "/calibration-17-12-2024.toml"
+
+# Calibration file.
+ANIPOSE_CALIBRATION_FILE = SESSION_FOLDER + "/calibration-15-1-2025.toml"
+
+# SLURM scripts.
+SESSION_NAME = SESSION_FOLDER.split("/")[-1]
 INFERENCE_SBATCH_SCRIPT = os.path.join(FILENAME_PREFIX, os.getcwd(), "_sleap_inference.sh")
 ANIPOSE_TRIANGULATION_SBATCH_SCRIPT = os.path.join(FILENAME_PREFIX, os.getcwd(), "_anipose_triangulation.sh")
 
+# Skeleton points and connections.
 POINT_INDICES = ["Nose", "Ear_R", "Ear_L", "TTI", "TailTip", "Head", "Trunk", "Tail0", "Tail1", "Tail2", "Shoulder_left", "Shoulder_right", "Haunch_left", "Haunch_right", "Neck"]
 POINTS_TO_EXCLUDE = ["Tail0", "Tail1", "Tail2", "TailTip"]
 CONNECTIONS = [["Nose", "Head"], ["Ear_L", "Head"], ["Ear_R", "Head"], ["Shoulder_left", "Neck"], ["Haunch_left", "Trunk"], ["Haunch_right", "Trunk"], ["Shoulder_right", "Neck"], ["TTI", "Tail0"], ["Haunch_left", "TTI"], ["Haunch_right", "TTI"], ["Tail0", "Tail1"], ["Tail1", "Tail2"], ["Tail2", "TailTip"], ["Head", "Neck"], ["Neck", "Trunk"], ["Trunk", "TTI"], ["Shoulder_right", "Shoulder_left"], ["Haunch_left", "Haunch_right"]]
@@ -529,6 +535,112 @@ def rotation_matrix_z(angle):
     ])
 
 
+def make_topdown_skeleton_video(black_reprojection_tracks_file, white_reprojection_tracks_file, fps, width, height, topdown_camera_name="Camera3"):
+    """
+    Makes a video of the skeletons inside a bounding box using the 3D tracks reprojected to the top-down view.
+
+    Parameters:
+        - black_reprojection_tracks_file (str): Path to the black mouse reprojected tracks file.
+        - white_reprojection_tracks_file (str): Path to the white mouse reprojected tracks file.
+        - topdown_camera_name (str): Name of the top-down camera.clear
+        - fps (int): Frames per second of the video.
+        - width (int): Width of the video.
+        - height (int): Height of the video.
+
+    Returns:
+        - None.
+    """
+
+    ### Get 3D tracks reprojected to top-down view.
+
+    # Black mouse.
+    black_reprojection_tracks_data = black_reprojection_tracks_file[topdown_camera_name][:, 0, :] # Squash along dim 1 (only 1 instance).
+
+    # White mouse.
+    white_reprojection_tracks_data = white_reprojection_tracks_file[topdown_camera_name][:, 0, :] # Squash along dim 1 (only 1 instance).
+
+    ### Get the corners.
+
+    max_x = np.max([np.max(black_reprojection_tracks_data[:, :, 0]), np.max(white_reprojection_tracks_data[:, :, 0])])
+    max_y = np.max([np.max(black_reprojection_tracks_data[:, :, 1]), np.max(white_reprojection_tracks_data[:, :, 1])])
+    min_x = np.min([np.min(black_reprojection_tracks_data[:, :, 0]), np.min(white_reprojection_tracks_data[:, :, 0])])
+    min_y = np.min([np.min(black_reprojection_tracks_data[:, :, 1]), np.min(white_reprojection_tracks_data[:, :, 1])])
+    corners = np.array([[min_x, min_y], [min_x, max_y], [max_x, min_y], [max_x, max_y]])
+
+    ### Make a video of skeletons moving in a bounding box.
+
+    # Create video writer.
+    output_video_path = os.path.join(SESSION_FOLDER, "topdown_skeleton_video.mp4")
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
+    num_frames = black_reprojection_tracks_data.shape[0]
+
+    # Loop through frames.
+    for frame_num in range(num_frames):
+
+        # Create blank image.
+        frame = np.ones((height, width, 3), dtype=np.uint8) * 255
+
+        # Get the tracks for this frame.
+        black_frame_tracks = black_reprojection_tracks_data[frame_num]
+        white_frame_tracks = black_reprojection_tracks_data[frame_num]
+
+        # Calculate the center of the bounding box.
+        center = np.mean(corners, axis=0)
+
+        # Calculate the translation needed to center the bounding box in the frame.
+        translation_x = width / 2 - center[0]
+        translation_y = height / 2 - center[1]
+
+        # Apply translation to center the points.
+        black_frame_tracks[:, 0] += translation_x
+        black_frame_tracks[:, 1] += translation_y
+        white_frame_tracks[:, 0] += translation_x
+        white_frame_tracks[:, 1] += translation_y
+
+        indices_to_exclude = [POINT_INDICES.index(point) for point in POINTS_TO_EXCLUDE]
+
+        # Draw the bounding box.
+        for i in range(4):
+            point1 = corners[i]
+            point2 = corners[(i + 1) % 4]
+            cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1])), (0, 0, 0), 2)
+
+        # Overlay the tracks on the frame, blue for white mouse, red for black mouse.
+        for i in range(black_frame_tracks.shape[0]):
+            if i in indices_to_exclude:
+                continue
+            x, y = int(black_frame_tracks[i, 0]), int(black_frame_tracks[i, 1])
+            cv2.circle(frame, (x, y), 4, (0, 0, 255), -1)
+        for i in range(white_frame_tracks.shape[0]):
+            if i in indices_to_exclude:
+                continue
+            x, y = int(white_frame_tracks[i, 0]), int(white_frame_tracks[i, 1])
+            cv2.circle(frame, (x, y), 4, (255, 0, 0), -1)
+
+        # Draw lines for the connections.
+        # Black mouse.
+        for connection in CONNECTIONS:
+            point1 = black_frame_tracks[POINT_INDICES.index(connection[0])]
+            point2 = black_frame_tracks[POINT_INDICES.index(connection[1])]
+            if connection[0] in POINTS_TO_EXCLUDE or connection[1] in POINTS_TO_EXCLUDE:
+                continue
+            cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), (0, 0, 255), 2)
+        # White mouse.
+        for connection in CONNECTIONS:
+            point1 = white_frame_tracks[POINT_INDICES.index(connection[0])]
+            point2 = white_frame_tracks[POINT_INDICES.index(connection[1])]
+            if connection[0] in POINTS_TO_EXCLUDE or connection[1] in POINTS_TO_EXCLUDE:
+                continue
+            cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), (255, 0, 0), 2)
+
+        # Write the frame to the output video.
+        out.write(frame)
+
+    # Release the video writer.
+    out.release()
+
+
 def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_folder, width, height, fps):
     """
     Makes an animation of just the tracked points.
@@ -771,8 +883,8 @@ def make_video():
 
     # Try making the skeleton video and grab the error if there is one.
     try:
-        print("Skipping skeleton video (current implementation doesn't work very well).")
         # make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, SESSION_FOLDER, width, height, fps)
+        make_topdown_skeleton_video(black_reprojection_tracks_file, white_reprojection_tracks_file, "Camera3", fps, width, height)
     except Exception as e:
         print(f"\tError making skeleton video: {e}")
 

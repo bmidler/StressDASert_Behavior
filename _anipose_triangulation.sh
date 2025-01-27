@@ -11,18 +11,17 @@ module load anacondapy/2023.07-cuda
 eval "$(conda shell.bash hook)"
 conda activate sleap-anipose
 
-# Verify the current conda environment
+# Verify the current conda environment.
 echo "Current conda environment: $(conda info --envs | grep '*' | awk '{print $1}')"
 
 session_directory=$1
 calibration_file=$2
 output_filename=$3
 
-# Ensure the files have proper permissions
+# Ensure the files have proper permissions.
 find $session_directory -type f -exec chmod 744 {} \;
-# chmod 744 $calibration_file
 
-# Retry mechanism for slap-triangulate command
+# Retry mechanism for slap-triangulate command.
 max_retries=100
 retry_count=0
 success=0
@@ -47,7 +46,7 @@ if [ $success -eq 0 ]; then
     exit 1
 fi
 
-# Retry mechanism for slap-reproject command
+# Retry mechanism for slap-reproject command.
 reprojection_filename="${output_filename%.*}_reprojected.h5"
 retry_count=0
 success=0
