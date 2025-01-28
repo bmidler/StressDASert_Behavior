@@ -535,17 +535,14 @@ def rotation_matrix_z(angle):
     ])
 
 
-def make_topdown_skeleton_video(black_reprojection_tracks_file, white_reprojection_tracks_file, fps, width, height, topdown_camera_name="Camera3"):
+def make_topdown_skeleton_video(black_reprojection_tracks_file, white_reprojection_tracks_file, topdown_camera_name="Camera3"):
     """
     Makes a video of the skeletons inside a bounding box using the 3D tracks reprojected to the top-down view.
 
     Parameters:
-        - black_reprojection_tracks_file (str): Path to the black mouse reprojected tracks file.
-        - white_reprojection_tracks_file (str): Path to the white mouse reprojected tracks file.
-        - topdown_camera_name (str): Name of the top-down camera.clear
-        - fps (int): Frames per second of the video.
-        - width (int): Width of the video.
-        - height (int): Height of the video.
+        - black_reprojection_tracks_file (h5 file): black mouse reprojected tracks file.
+        - white_reprojection_tracks_file (h5 file): white mouse reprojected tracks file.
+        - topdown_camera_name (str): Name of the top-down camera.
 
     Returns:
         - None.
@@ -553,92 +550,123 @@ def make_topdown_skeleton_video(black_reprojection_tracks_file, white_reprojecti
 
     ### Get 3D tracks reprojected to top-down view.
 
-    # Black mouse.
-    black_reprojection_tracks_data = black_reprojection_tracks_file[topdown_camera_name][:, 0, :] # Squash along dim 1 (only 1 instance).
+    # Get white and black mouse tracks for top-down view.
+    black_reprojection_tracks_data = black_reprojection_tracks_file[topdown_camera_name][:, 0, :, :]  # Squash along dim 1 (only 1 instance).
+    white_reprojection_tracks_data = white_reprojection_tracks_file[topdown_camera_name][:, 0, :, :]  # Squash along dim 1 (only 1 instance).
 
-    # White mouse.
-    white_reprojection_tracks_data = white_reprojection_tracks_file[topdown_camera_name][:, 0, :] # Squash along dim 1 (only 1 instance).
+    # Remove points to exclude.
+    indices_to_exclude = [POINT_INDICES.index(point) for point in POINTS_TO_EXCLUDE]
+    black_reprojection_tracks_data_no_tail = np.delete(black_reprojection_tracks_data, indices_to_exclude, axis=1)
+    white_reprojection_tracks_data_no_tail = np.delete(white_reprojection_tracks_data, indices_to_exclude, axis=1)
 
-    ### Get the corners.
+    # Get the corners.
+    max_x = np.max([np.max(black_reprojection_tracks_data_no_tail[:, :, 0]), np.max(white_reprojection_tracks_data_no_tail[:, :, 0])])
+    max_y = np.max([np.max(black_reprojection_tracks_data_no_tail[:, :, 1]), np.max(white_reprojection_tracks_data_no_tail[:, :, 1])])
+    min_x = np.min([np.min(black_reprojection_tracks_data_no_tail[:, :, 0]), np.min(white_reprojection_tracks_data_no_tail[:, :, 0])])
+    min_y = np.min([np.min(black_reprojection_tracks_data_no_tail[:, :, 1]), np.min(white_reprojection_tracks_data_no_tail[:, :, 1])])
 
-    max_x = np.max([np.max(black_reprojection_tracks_data[:, :, 0]), np.max(white_reprojection_tracks_data[:, :, 0])])
-    max_y = np.max([np.max(black_reprojection_tracks_data[:, :, 1]), np.max(white_reprojection_tracks_data[:, :, 1])])
-    min_x = np.min([np.min(black_reprojection_tracks_data[:, :, 0]), np.min(white_reprojection_tracks_data[:, :, 0])])
-    min_y = np.min([np.min(black_reprojection_tracks_data[:, :, 1]), np.min(white_reprojection_tracks_data[:, :, 1])])
-    corners = np.array([[min_x, min_y], [min_x, max_y], [max_x, min_y], [max_x, max_y]])
+    corners = np.array([
+        [min_x, min_y],
+        [min_x, max_y],
+        [max_x, min_y],
+        [max_x, max_y]
+    ])
 
-    ### Make a video of skeletons moving in a bounding box.
+    ### Get the top-down video.
 
-    # Create video writer.
-    output_video_path = os.path.join(SESSION_FOLDER, "topdown_skeleton_video.mp4")
+    topdown_directory = os.path.join(SESSION_FOLDER, topdown_camera_name)
+    video_filename = [f for f in os.listdir(topdown_directory) if f.endswith(".mp4") and "track" not in f][0] # Makes sure we grab the original video.
+    video_path = os.path.join(topdown_directory, video_filename)
+    fname = os.path.join(SESSION_FOLDER, "topdown_skeleton_video.mp4")
+
+    ### Open the video file.
+
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise FileNotFoundError(f"Video file not found: {video_path}")
+    
+    # Get video properties.
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
-    out = cv2.VideoWriter(output_video_path, fourcc, fps, (width, height))
-    num_frames = black_reprojection_tracks_data.shape[0]
+    out = cv2.VideoWriter(f"{fname}", fourcc, fps, (width, height))
+    n_frames = np.shape(black_reprojection_tracks_data)[0] # In case I only tracked a subset of the video.
 
-    # Loop through frames.
-    for frame_num in range(num_frames):
+    # Make sure the tracks are the same length.
+    assert np.shape(black_reprojection_tracks_data)[0] == np.shape(white_reprojection_tracks_data)[0], "Black and white tracks are not the same length."
 
-        # Create blank image.
-        frame = np.ones((height, width, 3), dtype=np.uint8) * 255
+    # Report-out number of frames being tracked vs in the video.
+    n_frames_video = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    print(f"\tTracking {n_frames} frames out of {n_frames_video} in the video (based on the n frames tracked by sleap [0, n]).")
 
-        # Get the tracks for this frame.
-        black_frame_tracks = black_reprojection_tracks_data[frame_num]
-        white_frame_tracks = black_reprojection_tracks_data[frame_num]
+    ### Loop through the video frames and overlay the tracks.
 
-        # Calculate the center of the bounding box.
-        center = np.mean(corners, axis=0)
+    frame_num = 0
+    while cap.isOpened():
+            
+            # Read the frame.
+            ret, frame = cap.read()
+            if not ret:
+                break
 
-        # Calculate the translation needed to center the bounding box in the frame.
-        translation_x = width / 2 - center[0]
-        translation_y = height / 2 - center[1]
+            # Make the frame white.
+            frame = np.ones((height, width, 3), dtype=np.uint8) * 255
+    
+            # Get the tracks for this frame.
+            black_frame_tracks = black_reprojection_tracks_data[frame_num]
+            white_frame_tracks = white_reprojection_tracks_data[frame_num]
+    
+            # Overlay the tracks on the frame, blue for white mouse, red for black mouse.
+            for i in range(black_frame_tracks.shape[0]):
+                if i in indices_to_exclude:
+                    continue
+                x, y = int(black_frame_tracks[i, 0]), int(black_frame_tracks[i, 1])
+                cv2.circle(frame, (x, y), 4, (0, 0, 255), -1)
+            for i in range(white_frame_tracks.shape[0]):
+                if i in indices_to_exclude:
+                    continue
+                x, y = int(white_frame_tracks[i, 0]), int(white_frame_tracks[i, 1])
+                cv2.circle(frame, (x, y), 4, (255, 0, 0), -1)
 
-        # Apply translation to center the points.
-        black_frame_tracks[:, 0] += translation_x
-        black_frame_tracks[:, 1] += translation_y
-        white_frame_tracks[:, 0] += translation_x
-        white_frame_tracks[:, 1] += translation_y
+            # Draw lines for the connections.
+            # Black mouse.
+            for connection in CONNECTIONS:
+                point1 = black_frame_tracks[POINT_INDICES.index(connection[0])]
+                point2 = black_frame_tracks[POINT_INDICES.index(connection[1])]
+                if connection[0] in POINTS_TO_EXCLUDE or connection[1] in POINTS_TO_EXCLUDE:
+                    continue
+                cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), (0, 0, 255), 2)
+            # White mouse.
+            for connection in CONNECTIONS:
+                point1 = white_frame_tracks[POINT_INDICES.index(connection[0])]
+                point2 = white_frame_tracks[POINT_INDICES.index(connection[1])]
+                if connection[0] in POINTS_TO_EXCLUDE or connection[1] in POINTS_TO_EXCLUDE:
+                    continue
+                cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), (255, 0, 0), 2)
 
-        indices_to_exclude = [POINT_INDICES.index(point) for point in POINTS_TO_EXCLUDE]
+            # Draw the bounding box.
+            cv2.line(frame, (int(corners[0][0]), int(corners[0][1])), (int(corners[1][0]), int(corners[1][1])), (0, 0, 0), 2)
+            cv2.line(frame, (int(corners[0][0]), int(corners[0][1])), (int(corners[2][0]), int(corners[2][1])), (0, 0, 0), 2)
+            cv2.line(frame, (int(corners[1][0]), int(corners[1][1])), (int(corners[3][0]), int(corners[3][1])), (0, 0, 0), 2)
+            cv2.line(frame, (int(corners[2][0]), int(corners[2][1])), (int(corners[3][0]), int(corners[3][1])), (0, 0, 0), 2)
+    
+            # Write the frame to the output video.
+            out.write(frame)
+    
+            # Increment the frame number.
+            frame_num += 1
 
-        # Draw the bounding box.
-        for i in range(4):
-            point1 = corners[i]
-            point2 = corners[(i + 1) % 4]
-            cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1])), (0, 0, 0), 2)
+            # Break if we've reached the end of the tracks.
+            if frame_num >= n_frames:
+                break
 
-        # Overlay the tracks on the frame, blue for white mouse, red for black mouse.
-        for i in range(black_frame_tracks.shape[0]):
-            if i in indices_to_exclude:
-                continue
-            x, y = int(black_frame_tracks[i, 0]), int(black_frame_tracks[i, 1])
-            cv2.circle(frame, (x, y), 4, (0, 0, 255), -1)
-        for i in range(white_frame_tracks.shape[0]):
-            if i in indices_to_exclude:
-                continue
-            x, y = int(white_frame_tracks[i, 0]), int(white_frame_tracks[i, 1])
-            cv2.circle(frame, (x, y), 4, (255, 0, 0), -1)
+    ### Release the video and output video.
 
-        # Draw lines for the connections.
-        # Black mouse.
-        for connection in CONNECTIONS:
-            point1 = black_frame_tracks[POINT_INDICES.index(connection[0])]
-            point2 = black_frame_tracks[POINT_INDICES.index(connection[1])]
-            if connection[0] in POINTS_TO_EXCLUDE or connection[1] in POINTS_TO_EXCLUDE:
-                continue
-            cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), (0, 0, 255), 2)
-        # White mouse.
-        for connection in CONNECTIONS:
-            point1 = white_frame_tracks[POINT_INDICES.index(connection[0])]
-            point2 = white_frame_tracks[POINT_INDICES.index(connection[1])]
-            if connection[0] in POINTS_TO_EXCLUDE or connection[1] in POINTS_TO_EXCLUDE:
-                continue
-            cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), (255, 0, 0), 2)
-
-        # Write the frame to the output video.
-        out.write(frame)
-
-    # Release the video writer.
+    cap.release()
     out.release()
+
+    print(f"\tSaved skeleton video to {fname}.")
 
 
 def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_folder, width, height, fps):
@@ -672,15 +700,19 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
 
     ### Get max x, y, and z coordinate to draw a bounding box between all four corners.
 
-    # Get max x, y, and z coordinates--only from black mouse for now as its tracking is more stable.
-    max_x = np.max(black_3D_pose[:, :, 0])
-    max_y = np.max(black_3D_pose[:, :, 1])
-    max_z = np.max(black_3D_pose[:, :, 2])
+    # Get max x, y, and z coordinates--no tail points.
+    indices_to_exclude = [POINT_INDICES.index(point) for point in POINTS_TO_EXCLUDE]
+    black_3D_pose_to_tail = np.delete(black_3D_pose, indices_to_exclude, axis=1)
+    white_3D_pose_to_tail = np.delete(white_3D_pose, indices_to_exclude, axis=1)
 
-    # Get min x, y, and z coordinates--only from black mouse for now as its tracking is more stable.
-    min_x = np.min(black_3D_pose[:, :, 0])
-    min_y = np.min(black_3D_pose[:, :, 1])
-    min_z = np.min(black_3D_pose[:, :, 2])
+    max_x = np.max([np.max(black_3D_pose_to_tail[:, :, 0]), np.max(white_3D_pose_to_tail[:, :, 0])])
+    max_y = np.max([np.max(black_3D_pose_to_tail[:, :, 1]), np.max(white_3D_pose_to_tail[:, :, 1])])
+    max_z = np.max([np.max(black_3D_pose_to_tail[:, :, 2]), np.max(white_3D_pose_to_tail[:, :, 2])])
+
+    # Get min x, y, and z coordinates--no tail points.
+    min_x = np.min([np.min(black_3D_pose_to_tail[:, :, 0]), np.min(white_3D_pose_to_tail[:, :, 0])])
+    min_y = np.min([np.min(black_3D_pose_to_tail[:, :, 1]), np.min(white_3D_pose_to_tail[:, :, 1])])
+    min_z = np.min([np.min(black_3D_pose_to_tail[:, :, 2]), np.min(white_3D_pose_to_tail[:, :, 2])])
 
     # Get the corners of the bounding box.
     corners = np.array([
@@ -788,13 +820,32 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
         frame = cv2.subtract(frame, shaded_mask_3ch)
 
         # Draw points for mice.
-        for point in black_2D:
-            x, y = int(point[0]), int(point[1])
-            cv2.circle(frame, (x, y), 4, (0, 0, 255), -1)  # Red for black mouse.
+        for i in range(black_2D.shape[0]):
+                if i in indices_to_exclude:
+                    continue
+                x, y = int(black_2D[i, 0]), int(black_2D[i, 1])
+                cv2.circle(frame, (x, y), 4, (0, 0, 255), -1) # Red for black mouse.
+        for i in range(white_2D.shape[0]):
+                if i in indices_to_exclude:
+                    continue
+                x, y = int(white_2D[i, 0]), int(white_2D[i, 1])
+                cv2.circle(frame, (x, y), 4, (255, 0, 0), -1) # Blue for white mouse.
 
-        for point in white_2D:
-            x, y = int(point[0]), int(point[1])
-            cv2.circle(frame, (x, y), 4, (255, 0, 0), -1)  # Blue for white mouse.
+        # Draw lines for the connections.
+        # Black mouse.
+        for connection in CONNECTIONS:
+            point1 = black_2D[POINT_INDICES.index(connection[0])]
+            point2 = black_2D[POINT_INDICES.index(connection[1])]
+            if connection[0] in POINTS_TO_EXCLUDE or connection[1] in POINTS_TO_EXCLUDE:
+                continue
+            cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), (0, 0, 255), 2)
+        # White mouse.
+        for connection in CONNECTIONS:
+            point1 = white_2D[POINT_INDICES.index(connection[0])]
+            point2 = white_2D[POINT_INDICES.index(connection[1])]
+            if connection[0] in POINTS_TO_EXCLUDE or connection[1] in POINTS_TO_EXCLUDE:
+                continue
+            cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), (255, 0, 0), 2)
 
         # Draw bounding box corners in black.
         for corner in corners_2D:
@@ -860,10 +911,6 @@ def make_video():
         except Exception as e:
             print(f"\tError making video for camera view {camera_view}: {e}")
 
-    # Close the HDF5 files
-    black_reprojection_tracks_file.close()
-    white_reprojection_tracks_file.close()
-
     print("\tTracked point videos done, now making skeleton video.")
 
     ### Make a video of just the skeletons.
@@ -883,12 +930,16 @@ def make_video():
 
     # Try making the skeleton video and grab the error if there is one.
     try:
-        # make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, SESSION_FOLDER, width, height, fps)
-        make_topdown_skeleton_video(black_reprojection_tracks_file, white_reprojection_tracks_file, "Camera3", fps, width, height)
+        make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, SESSION_FOLDER, width, height, fps)
+        make_topdown_skeleton_video(black_reprojection_tracks_file, white_reprojection_tracks_file, "Camera3")
     except Exception as e:
         print(f"\tError making skeleton video: {e}")
 
     print("\tMade skeleton videos.")
+
+    # Close the HDF5 files
+    black_reprojection_tracks_file.close()
+    white_reprojection_tracks_file.close()
 
 
 def main():
