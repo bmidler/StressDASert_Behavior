@@ -702,17 +702,17 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
 
     # Get max x, y, and z coordinates--no tail points.
     indices_to_exclude = [POINT_INDICES.index(point) for point in POINTS_TO_EXCLUDE]
-    black_3D_pose_to_tail = np.delete(black_3D_pose, indices_to_exclude, axis=1)
-    white_3D_pose_to_tail = np.delete(white_3D_pose, indices_to_exclude, axis=1)
+    black_3D_pose_no_tail = np.delete(black_3D_pose, indices_to_exclude, axis=1)
+    white_3D_pose_no_tail = np.delete(white_3D_pose, indices_to_exclude, axis=1)
 
-    max_x = np.max([np.max(black_3D_pose_to_tail[:, :, 0]), np.max(white_3D_pose_to_tail[:, :, 0])])
-    max_y = np.max([np.max(black_3D_pose_to_tail[:, :, 1]), np.max(white_3D_pose_to_tail[:, :, 1])])
-    max_z = np.max([np.max(black_3D_pose_to_tail[:, :, 2]), np.max(white_3D_pose_to_tail[:, :, 2])])
+    max_x = np.max([np.max(black_3D_pose_no_tail[:, :, 0]), np.max(white_3D_pose_no_tail[:, :, 0])])
+    max_y = np.max([np.max(black_3D_pose_no_tail[:, :, 1]), np.max(white_3D_pose_no_tail[:, :, 1])])
+    max_z = np.max([np.max(black_3D_pose_no_tail[:, :, 2]), np.max(white_3D_pose_no_tail[:, :, 2])])
 
     # Get min x, y, and z coordinates--no tail points.
-    min_x = np.min([np.min(black_3D_pose_to_tail[:, :, 0]), np.min(white_3D_pose_to_tail[:, :, 0])])
-    min_y = np.min([np.min(black_3D_pose_to_tail[:, :, 1]), np.min(white_3D_pose_to_tail[:, :, 1])])
-    min_z = np.min([np.min(black_3D_pose_to_tail[:, :, 2]), np.min(white_3D_pose_to_tail[:, :, 2])])
+    min_x = np.min([np.min(black_3D_pose_no_tail[:, :, 0]), np.min(white_3D_pose_no_tail[:, :, 0])])
+    min_y = np.min([np.min(black_3D_pose_no_tail[:, :, 1]), np.min(white_3D_pose_no_tail[:, :, 1])])
+    min_z = np.min([np.min(black_3D_pose_no_tail[:, :, 2]), np.min(white_3D_pose_no_tail[:, :, 2])])
 
     # Get the corners of the bounding box.
     corners = np.array([
@@ -784,7 +784,7 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
             [corners_2D[4], corners_2D[5], corners_2D[7], corners_2D[6]],
             [corners_2D[0], corners_2D[1], corners_2D[5], corners_2D[4]],
             [corners_2D[2], corners_2D[3], corners_2D[7], corners_2D[6]],
-            [corners_2D[0], corners_2D[2], corners_2D[6], corners_2D[4]], # Floor.
+            [corners_2D[1], corners_2D[3], corners_2D[5], corners_2D[7]], # Floor.
         ]
 
         # Create a blank mask for counting overlaps.
