@@ -33,14 +33,14 @@ MAKE_VIDEO = True
 FILENAME_PREFIX = "/mnt/cup/labs/witten/"
 
 # Models.
-SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/Troubleshooting/3-2-2025/TS_DA_1"
+SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/Troubleshooting/18-2-2025/TS_B_2_PhotometryTest"
 CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/250125_171608.centroid.n=1494"
 CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/250125_211111.centered_instance.n=1494"
-CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/241212_180150.centroid.n=1002"
-CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/241212_214808.centered_instance.n=1002"
+CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/250210_144930.centroid.n=2021"
+CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/250210_194807.centered_instance.n=2021"
 
 # Calibration file.
-ANIPOSE_CALIBRATION_FILE = SESSION_FOLDER + "/calibration-3-2-2025.toml"
+ANIPOSE_CALIBRATION_FILE = SESSION_FOLDER + "/calibration-18-2-2025.toml"
 
 # SLURM scripts.
 SESSION_NAME = SESSION_FOLDER.split("/")[-1]
@@ -949,8 +949,6 @@ def main():
     if not os.path.exists(os.path.join("SBATCH_outputs", SESSION_NAME)):  # Check if the output folder exists.
         os.makedirs(os.path.join("SBATCH_outputs", SESSION_NAME))  # Create the output folder.
 
-    print(f"Running pipeline for session: {SESSION_NAME}")
-
     ### Run check to make sure the global variable files and SBATCH script exist.
 
     if not os.path.exists(SESSION_FOLDER):
@@ -971,6 +969,13 @@ def main():
         raise FileNotFoundError(f"Anipose triangulation SBATCH script does not exist: {ANIPOSE_TRIANGULATION_SBATCH_SCRIPT}")
     
     ### Run sleap inference for each camera view (video) in the session for black and white mice.
+
+    print(f"Running pipeline for session: {SESSION_NAME}")
+    print("Using sleap models:")
+    print(f"\tBlack mouse centroid model: {CENTROID_MODEL_BLACK.split("/")[-1]}")
+    print(f"\tBlack mouse centered model: {CENTERED_MODEL_BLACK.split("/")[-1]}")
+    print(f"\tWhite mouse centroid model: {CENTROID_MODEL_WHITE.split("/")[-1]}")
+    print(f"\tWhite mouse centered model: {CENTERED_MODEL_WHITE.split("/")[-1]}")
 
     # Black mouse.
     print("Running sleap inference for black mouse...")
