@@ -33,14 +33,14 @@ MAKE_VIDEO = True
 FILENAME_PREFIX = "/mnt/cup/labs/witten/"
 
 # Models.
-SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/Troubleshooting/18-2-2025/TS_B_2_PhotometryTest"
+SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/ParameterTest/Day1/TS_B_3-Day1-33Hz"
 CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/250125_171608.centroid.n=1494"
 CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/250125_211111.centered_instance.n=1494"
 CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/250210_144930.centroid.n=2021"
 CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/250210_194807.centered_instance.n=2021"
 
 # Calibration file.
-ANIPOSE_CALIBRATION_FILE = SESSION_FOLDER + "/calibration-18-2-2025.toml"
+ANIPOSE_CALIBRATION_FILE = SESSION_FOLDER + "/calibration-4-3-2025.toml"
 
 # SLURM scripts.
 SESSION_NAME = SESSION_FOLDER.split("/")[-1]
@@ -49,7 +49,7 @@ ANIPOSE_TRIANGULATION_SBATCH_SCRIPT = os.path.join(FILENAME_PREFIX, os.getcwd(),
 
 # Skeleton points and connections.
 POINT_INDICES = ["Nose", "Ear_R", "Ear_L", "TTI", "TailTip", "Head", "Trunk", "Tail0", "Tail1", "Tail2", "Shoulder_left", "Shoulder_right", "Haunch_left", "Haunch_right", "Neck"]
-POINTS_TO_EXCLUDE = ["Tail0", "Tail1", "Tail2", "TailTip"]
+POINTS_TO_EXCLUDE = [] # ["Tail0", "Tail1", "Tail2", "TailTip"]
 CONNECTIONS = [["Shoulder_left", "Haunch_left"], ["Haunch_right", "Shoulder_right"], ["Ear_L", "Nose"], ["Ear_R", "Nose"], ["Nose", "Head"], ["Ear_L", "Head"], ["Ear_R", "Head"], ["Shoulder_left", "Neck"], ["Haunch_left", "Trunk"], ["Haunch_right", "Trunk"], ["Shoulder_right", "Neck"], ["TTI", "Tail0"], ["Haunch_left", "TTI"], ["Haunch_right", "TTI"], ["Tail0", "Tail1"], ["Tail1", "Tail2"], ["Tail2", "TailTip"], ["Head", "Neck"], ["Neck", "Trunk"], ["Trunk", "TTI"], ["Shoulder_right", "Shoulder_left"], ["Haunch_left", "Haunch_right"]]
 
 ### Function definitions.
