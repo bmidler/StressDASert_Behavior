@@ -7,9 +7,10 @@
 #SBATCH -p all
 #SBATCH -c 1
 #SBATCH --mem=32GB
-#SBATCH -t 12:00:00
+#SBATCH -t 48:00:00
 #SBATCH --error=SBATCH_outputs/behavior_pipeline_error_%j_%x_%A_%a_%N_%t.txt
 #SBATCH --output=SBATCH_outputs/behavior_pipeline_output_%j_%x_%A_%a_%N_%t.txt
+#SBATCH --partition=witten
 
 # Check if day directory is provided as argument
 if [ $# -eq 0 ]; then

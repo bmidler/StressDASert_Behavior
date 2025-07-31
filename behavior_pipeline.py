@@ -28,38 +28,63 @@ import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
 
-# ### Global variables.
-
-# MAKE_VIDEO = True
-# FILENAME_PREFIX = "/mnt/cup/labs/witten/"
-
-# # Models.
-# SESSION_FOLDER = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Data/Troubleshooting/NewRigTest/Day2/test"
-# CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Mine+Misael_Bl6_250710_193204.centroid.n=2104"
-# CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Mine+Misael_Bl6_250710_221747.centered_instance.n=2104"
-# CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/Mine+Jiaxuan_SW_250714_091628.centroid.n=4099"
-# CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Mine+Jiaxuan_SW_250714_153818.centered_instance.n=4099"
-
-# # Calibration file (file in session folder with "calibration" in the name).
-# session_folder_contents = os.listdir(SESSION_FOLDER)
-# ANIPOSE_CALIBRATION_FILE = None
-# for file in session_folder_contents:
-#     if "calibration" in file and file.endswith(".toml"):
-#         ANIPOSE_CALIBRATION_FILE = os.path.join(SESSION_FOLDER, file)
-#         break
-# TOP_CAMERA_NAME = "Camera0"  # The top-down camera name.
-
-# # SLURM scripts.
-# SESSION_NAME = SESSION_FOLDER.split("/")[-1]
-# INFERENCE_SBATCH_SCRIPT = os.path.join(FILENAME_PREFIX, os.getcwd(), "_sleap_inference.sh")
-# ANIPOSE_TRIANGULATION_SBATCH_SCRIPT = os.path.join(FILENAME_PREFIX, os.getcwd(), "_anipose_triangulation.sh")
-
-# # Skeleton points and connections.
-# POINT_INDICES = ["Nose", "Ear_R", "Ear_L", "TTI", "TailTip", "Head", "Trunk", "Tail0", "Tail1", "Tail2", "Shoulder_left", "Shoulder_right", "Haunch_left", "Haunch_right", "Neck"]
-# POINTS_TO_EXCLUDE = ["Tail0", "Tail1", "Tail2", "TailTip"]
-# CONNECTIONS = [["Shoulder_left", "Haunch_left"], ["Haunch_right", "Shoulder_right"], ["Ear_L", "Nose"], ["Ear_R", "Nose"], ["Nose", "Head"], ["Ear_L", "Head"], ["Ear_R", "Head"], ["Shoulder_left", "Neck"], ["Haunch_left", "Trunk"], ["Haunch_right", "Trunk"], ["Shoulder_right", "Neck"], ["TTI", "Tail0"], ["Haunch_left", "TTI"], ["Haunch_right", "TTI"], ["Tail0", "Tail1"], ["Tail1", "Tail2"], ["Tail2", "TailTip"], ["Head", "Neck"], ["Neck", "Trunk"], ["Trunk", "TTI"], ["Shoulder_right", "Shoulder_left"], ["Haunch_left", "Haunch_right"]]
-
 ### Function definitions.
+
+def reset_session(session_folder):
+    """
+    In case we're re-processing a session, delete all QC video files and track files (for session and individual cameras).
+
+    Parameters:
+        - session_folder (str): Path to the session folder containing video folders for each camera.
+
+    Returns:
+        - None.
+    """
+
+    ### Get list of files in session directory and delete QC videos and tracks.
+
+    files = os.listdir(session_folder)
+
+    # Videos.
+    if "skeleton_video.mp4" in files:
+        os.remove(os.path.join(session_folder, "skeleton_video.mp4"))
+    
+    if "topdown_skeleton_video.mp4" in files:
+        os.remove(os.path.join(session_folder, "topdown_skeleton_video.mp4"))
+
+    # Tracks.
+    if "black_triangulated_reprojected.h5" in files:
+        os.remove(os.path.join(session_folder, "black_triangulated_reprojected.h5"))
+    if "white_triangulated_reprojected.h5" in files:
+        os.remove(os.path.join(session_folder, "white_triangulated_reprojected.h5"))
+    if "black_triangulated.h5" in files:
+        os.remove(os.path.join(session_folder, "black_triangulated.h5"))
+    if "white_triangulated.h5" in files:
+        os.remove(os.path.join(session_folder, "white_triangulated.h5"))
+
+    ### Remove tracks and QC video files from each camera's directory.
+
+    camera_directories = [f for f in os.listdir(session_folder) if os.path.isdir(os.path.join(session_folder, f)) and "Camera" in f]
+
+    for camera_dir in camera_directories:
+        files = os.listdir(os.path.join(session_folder, camera_dir))
+        # Videos.
+        if "tracked_video.mp4" in files:
+            os.remove(os.path.join(session_folder, camera_dir, "tracked_video.mp4"))
+
+        # Tracks--delete all h5 and slp files.
+        for file in files:
+            if file.endswith(".h5") or file.endswith(".slp"):
+                os.remove(os.path.join(session_folder, camera_dir, file))
+
+    ### Remove UnusedInference folders.
+
+    for camera_dir in camera_directories:
+        unused_inference_path = os.path.join(session_folder, camera_dir, "UnusedInference")
+        if os.path.exists(unused_inference_path):
+            for file in os.listdir(unused_inference_path):
+                os.remove(os.path.join(unused_inference_path, file))
+            os.rmdir(unused_inference_path)
 
 def run_sleap_inference(session_folder, centroid_model, centered_model, mouse_color):
     """
@@ -89,6 +114,9 @@ def run_sleap_inference(session_folder, centroid_model, centered_model, mouse_co
         for file in os.listdir(os.path.join(session_folder, folder)):
             if file.endswith(".mp4"):
                 video_paths.append(os.path.join(session_folder, folder, file))
+
+    # Drop video if name is "tracked_video", in case we're re-processing a session.
+    video_paths = [path for path in video_paths if "tracked_video" not in path]
 
     print(f"\tFound {len(video_paths)} videos in session folder.")
 
@@ -949,12 +977,12 @@ def make_video():
     white_reprojection_tracks_file.close()
 
 
-def run_session():
+def run_session(cleanup_session=True):
     """
     Runs a single session using the defined global variables.
 
     Parameters:
-        - None.
+        - cleanup_session (bool): Whether to clean up the session folder before running the session. Default is True.
 
     Returns:
         - None.
@@ -983,6 +1011,11 @@ def run_session():
         raise FileNotFoundError(f"SBATCH script does not exist: {INFERENCE_SBATCH_SCRIPT}")
     if not os.path.exists(ANIPOSE_TRIANGULATION_SBATCH_SCRIPT):
         raise FileNotFoundError(f"Anipose triangulation SBATCH script does not exist: {ANIPOSE_TRIANGULATION_SBATCH_SCRIPT}")
+    
+    ### Clean-up any old inference files.
+
+    if cleanup_session:
+        reset_session(SESSION_FOLDER)
     
     ### Run sleap inference for each camera view (video) in the session for black and white mice.
 
@@ -1022,6 +1055,7 @@ def run_session():
 
     else:
         print("Not making videos.")
+
 
 def setup_session(session_folder):
     """
@@ -1076,6 +1110,7 @@ def setup_session(session_folder):
     run_session() # Run the session processing.
 
     print(f"Completed processing session: {SESSION_NAME}")
+
 
 def main():
     if len(sys.argv) != 2:

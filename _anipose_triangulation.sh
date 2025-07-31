@@ -5,7 +5,8 @@
 
 #SBATCH -c 1
 #SBATCH --mem=200GB
-#SBATCH -t 12:00:00
+#SBATCH -t 24:00:00
+#SBATCH --partition=witten
 
 module load anacondapy/2023.07-cuda
 eval "$(conda shell.bash hook)"
