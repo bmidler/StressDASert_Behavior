@@ -448,14 +448,14 @@ def make_single_video(video_path, black_tracks, white_tracks, fname):
                 point2 = black_frame_tracks[POINT_INDICES.index(connection[1])]
                 if connection[0] in POINTS_TO_EXCLUDE or connection[1] in POINTS_TO_EXCLUDE:
                     continue
-                cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), (0, 0, 255), 2)
+                cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), EXPERIMENTAL_RGB, 2)
             # White mouse.
             for connection in CONNECTIONS:
                 point1 = white_frame_tracks[POINT_INDICES.index(connection[0])]
                 point2 = white_frame_tracks[POINT_INDICES.index(connection[1])]
                 if connection[0] in POINTS_TO_EXCLUDE or connection[1] in POINTS_TO_EXCLUDE:
                     continue
-                cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), (255, 0, 0), 2)
+                cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), AGGRESSOR_RGB, 2)
     
             # Write the frame to the output video.
             out.write(frame)
@@ -657,12 +657,12 @@ def make_topdown_skeleton_video(black_reprojection_tracks_file, white_reprojecti
                 if i in indices_to_exclude:
                     continue
                 x, y = int(black_frame_tracks[i, 0]), int(black_frame_tracks[i, 1])
-                cv2.circle(frame, (x, y), 4, (0, 0, 255), -1)
+                cv2.circle(frame, (x, y), 4, EXPERIMENTAL_RGB, -1)
             for i in range(white_frame_tracks.shape[0]):
                 if i in indices_to_exclude:
                     continue
                 x, y = int(white_frame_tracks[i, 0]), int(white_frame_tracks[i, 1])
-                cv2.circle(frame, (x, y), 4, (255, 0, 0), -1)
+                cv2.circle(frame, (x, y), 4, AGGRESSOR_RGB, -1)
 
             # Draw lines for the connections.
             # Black mouse.
@@ -671,14 +671,14 @@ def make_topdown_skeleton_video(black_reprojection_tracks_file, white_reprojecti
                 point2 = black_frame_tracks[POINT_INDICES.index(connection[1])]
                 if connection[0] in POINTS_TO_EXCLUDE or connection[1] in POINTS_TO_EXCLUDE:
                     continue
-                cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), (0, 0, 255), 2)
+                cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), EXPERIMENTAL_RGB, 2)
             # White mouse.
             for connection in CONNECTIONS:
                 point1 = white_frame_tracks[POINT_INDICES.index(connection[0])]
                 point2 = white_frame_tracks[POINT_INDICES.index(connection[1])]
                 if connection[0] in POINTS_TO_EXCLUDE or connection[1] in POINTS_TO_EXCLUDE:
                     continue
-                cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), (255, 0, 0), 2)
+                cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), AGGRESSOR_RGB, 2)
 
             # Draw the bounding box.
             cv2.line(frame, (int(corners[0][0]), int(corners[0][1])), (int(corners[1][0]), int(corners[1][1])), (0, 0, 0), 2)
@@ -859,12 +859,12 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
                 if i in indices_to_exclude:
                     continue
                 x, y = int(black_2D[i, 0]), int(black_2D[i, 1])
-                cv2.circle(frame, (x, y), 4, (0, 0, 255), -1) # Red for black mouse.
+                cv2.circle(frame, (x, y), 4, EXPERIMENTAL_RGB, -1) # Experimental.
         for i in range(white_2D.shape[0]):
                 if i in indices_to_exclude:
                     continue
                 x, y = int(white_2D[i, 0]), int(white_2D[i, 1])
-                cv2.circle(frame, (x, y), 4, (255, 0, 0), -1) # Blue for white mouse.
+                cv2.circle(frame, (x, y), 4, AGGRESSOR_RGB, -1) # Aggressor.
 
         # Draw lines for the connections.
         # Black mouse.
@@ -873,14 +873,14 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
             point2 = black_2D[POINT_INDICES.index(connection[1])]
             if connection[0] in POINTS_TO_EXCLUDE or connection[1] in POINTS_TO_EXCLUDE:
                 continue
-            cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), (0, 0, 255), 2)
+            cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), EXPERIMENTAL_RGB, 2)
         # White mouse.
         for connection in CONNECTIONS:
             point1 = white_2D[POINT_INDICES.index(connection[0])]
             point2 = white_2D[POINT_INDICES.index(connection[1])]
             if connection[0] in POINTS_TO_EXCLUDE or connection[1] in POINTS_TO_EXCLUDE:
                 continue
-            cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), (255, 0, 0), 2)
+            cv2.line(frame, (int(point1[0]), int(point1[1])), (int(point2[0]), int(point2[1]),), AGGRESSOR_RGB, 2)
 
         # Draw bounding box corners in black.
         for corner in corners_2D:
@@ -1015,6 +1015,7 @@ def run_session(cleanup_session=True):
     ### Clean-up any old inference files.
 
     if cleanup_session:
+        print(f"Cleaning up session folder: {SESSION_FOLDER}")
         reset_session(SESSION_FOLDER)
     
     ### Run sleap inference for each camera view (video) in the session for black and white mice.
@@ -1074,15 +1075,18 @@ def setup_session(session_folder):
     global ANIPOSE_CALIBRATION_FILE, TOP_CAMERA_NAME, SESSION_NAME
     global INFERENCE_SBATCH_SCRIPT, ANIPOSE_TRIANGULATION_SBATCH_SCRIPT
     global POINT_INDICES, POINTS_TO_EXCLUDE, CONNECTIONS
-    
+    global AGGRESSOR_RGB, EXPERIMENTAL_RGB
+
     ### Global variables.
     MAKE_VIDEO = True
     FILENAME_PREFIX = "/mnt/cup/labs/witten/"
+    AGGRESSOR_RGB = (151, 168, 71) # CV2 uses order BGR.
+    EXPERIMENTAL_RGB = (45, 135, 241) # CV2 uses order BGR.
 
     # Models.
     SESSION_FOLDER = session_folder
-    CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Mine+Misael_Bl6_250710_193204.centroid.n=2104"
-    CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Mine+Misael_Bl6_250710_221747.centered_instance.n=2104"
+    CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Mine+Misael_Bl6_250801_180543.centroid.n=2669"
+    CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Mine+Misael_Bl6_250802_000544.centered_instance.n=2669"
     CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/Mine+Jiaxuan_SW_250714_091628.centroid.n=4099"
     CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/Mine+Jiaxuan_SW_250714_153818.centered_instance.n=4099"
 
@@ -1093,6 +1097,8 @@ def setup_session(session_folder):
         if "calibration" in file and file.endswith(".toml"):
             ANIPOSE_CALIBRATION_FILE = os.path.join(SESSION_FOLDER, file)
             break
+    if ANIPOSE_CALIBRATION_FILE is None:
+        raise FileNotFoundError("No calibration file found in session folder. Please provide a calibration file with 'calibration' in the name and that ends with .toml.")
     TOP_CAMERA_NAME = "Camera0"  # The top-down camera name.
 
     # SLURM scripts.
