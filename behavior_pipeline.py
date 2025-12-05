@@ -594,11 +594,27 @@ def make_topdown_skeleton_video(black_reprojection_tracks_file, white_reprojecti
     black_reprojection_tracks_data_no_tail = np.delete(black_reprojection_tracks_data, indices_to_exclude, axis=1)
     white_reprojection_tracks_data_no_tail = np.delete(white_reprojection_tracks_data, indices_to_exclude, axis=1)
 
-    # Get the corners.
-    max_x = np.max([np.max(black_reprojection_tracks_data_no_tail[:, :, 0]), np.max(white_reprojection_tracks_data_no_tail[:, :, 0])])
-    max_y = np.max([np.max(black_reprojection_tracks_data_no_tail[:, :, 1]), np.max(white_reprojection_tracks_data_no_tail[:, :, 1])])
-    min_x = np.min([np.min(black_reprojection_tracks_data_no_tail[:, :, 0]), np.min(white_reprojection_tracks_data_no_tail[:, :, 0])])
-    min_y = np.min([np.min(black_reprojection_tracks_data_no_tail[:, :, 1]), np.min(white_reprojection_tracks_data_no_tail[:, :, 1])])
+    # Get the corners using percentiles to exclude outliers.
+    percentile_low = 1  # Exclude bottom 1%
+    percentile_high = 99  # Exclude top 1%
+    
+    all_x = np.concatenate([black_reprojection_tracks_data_no_tail[:, :, 0].flatten(), 
+                           white_reprojection_tracks_data_no_tail[:, :, 0].flatten()])
+    all_y = np.concatenate([black_reprojection_tracks_data_no_tail[:, :, 1].flatten(), 
+                           white_reprojection_tracks_data_no_tail[:, :, 1].flatten()])
+    
+    max_x = np.percentile(all_x, percentile_high)
+    max_y = np.percentile(all_y, percentile_high)
+    min_x = np.percentile(all_x, percentile_low)
+    min_y = np.percentile(all_y, percentile_low)
+
+    # Add padding to the bounding box
+    padding_x = (max_x - min_x) * 0.02
+    padding_y = (max_y - min_y) * 0.02
+    min_x -= padding_x
+    max_x += padding_x
+    min_y -= padding_y
+    max_y += padding_y
 
     corners = np.array([
         [min_x, min_y],
@@ -732,7 +748,7 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
 
     # Assert the 3D pose files are the same length.
     assert black_3D_pose.shape[0] == white_3D_pose.shape[0], "Black and white mouse 3D pose files do not have the same number of frames."
-
+    
     ### Get max x, y, and z coordinate to draw a bounding box between all four corners.
 
     # Get max x, y, and z coordinates--no tail points.
@@ -740,14 +756,35 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
     black_3D_pose_no_tail = np.delete(black_3D_pose, indices_to_exclude, axis=1)
     white_3D_pose_no_tail = np.delete(white_3D_pose, indices_to_exclude, axis=1)
 
-    max_x = np.max([np.max(black_3D_pose_no_tail[:, :, 0]), np.max(white_3D_pose_no_tail[:, :, 0])])
-    max_y = np.max([np.max(black_3D_pose_no_tail[:, :, 1]), np.max(white_3D_pose_no_tail[:, :, 1])])
-    max_z = np.max([np.max(black_3D_pose_no_tail[:, :, 2]), np.max(white_3D_pose_no_tail[:, :, 2])])
+    # Get the corners using percentiles to exclude outliers.
+    percentile_low = 1  # Exclude bottom 1%
+    percentile_high = 99  # Exclude top 1%
 
-    # Get min x, y, and z coordinates--no tail points.
-    min_x = np.min([np.min(black_3D_pose_no_tail[:, :, 0]), np.min(white_3D_pose_no_tail[:, :, 0])])
-    min_y = np.min([np.min(black_3D_pose_no_tail[:, :, 1]), np.min(white_3D_pose_no_tail[:, :, 1])])
-    min_z = np.min([np.min(black_3D_pose_no_tail[:, :, 2]), np.min(white_3D_pose_no_tail[:, :, 2])])
+    all_x = np.concatenate([black_3D_pose_no_tail[:, :, 0].flatten(), 
+                           white_3D_pose_no_tail[:, :, 0].flatten()])
+    all_y = np.concatenate([black_3D_pose_no_tail[:, :, 1].flatten(), 
+                           white_3D_pose_no_tail[:, :, 1].flatten()])
+    all_z = np.concatenate([black_3D_pose_no_tail[:, :, 2].flatten(), 
+                           white_3D_pose_no_tail[:, :, 2].flatten()])
+
+    max_x = np.percentile(all_x, percentile_high)
+    max_y = np.percentile(all_y, percentile_high)
+    max_z = np.percentile(all_z, percentile_high)
+
+    min_x = np.percentile(all_x, percentile_low)
+    min_y = np.percentile(all_y, percentile_low)
+    min_z = np.percentile(all_z, percentile_low)
+
+    # Add padding to the bounding box.
+    padding_x = (max_x - min_x) * 0.02
+    padding_y = (max_y - min_y) * 0.02
+    padding_z = (max_z - min_z) * 0.02
+    min_x -= padding_x
+    max_x += padding_x
+    min_y -= padding_y
+    max_y += padding_y
+    min_z -= padding_z
+    max_z += padding_z
 
     # Get the corners of the bounding box.
     corners = np.array([
@@ -764,7 +801,7 @@ def make_skeleton_video(black_3D_pose_filepath, white_3D_pose_filepath, session_
     ### Make animation: for each frame, project 3D points for both mice and box corners to 2D.
 
     # Create video writer.
-    output_video_path = output_video_path = os.path.join(session_folder, "skeleton_video.mp4")
+    output_video_path = output_video_path = os.path.join(session_folder, "3D_skeleton_video.mp4")
     fourcc = cv2.VideoWriter_fourcc(*"mp4v")
     frame_size = (width, height)
     out = cv2.VideoWriter(output_video_path, fourcc, fps, frame_size)
