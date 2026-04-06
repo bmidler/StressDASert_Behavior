@@ -4,7 +4,6 @@
 # Where N is the number of sessions minus 1.
 
 #SBATCH -J behavior_pipeline
-#SBATCH -p all
 #SBATCH -c 1
 #SBATCH --mem=32GB
 #SBATCH -t 48:00:00
@@ -19,24 +18,31 @@ if [ $# -eq 0 ]; then
     exit 1
 fi
 
+# Day directory is the path to the directory containing all sessions for a given day, relative to the slurm script.
 DAY_DIRECTORY=$1
 
 # Validate that the directory exists
 if [ ! -d "$DAY_DIRECTORY" ]; then
-    echo "Error: Directory $DAY_DIRECTORY does not exist"
+    echo "Error: Directory $DAY_DIRECTORY does not exist."
     exit 1
 fi
 
-# Get all session directories (excluding calibration)
+# Get all session directories (excluding sessions with "calibration" in the name)
 session_dirs=()
 for session_dir in "$DAY_DIRECTORY"/*; do
     if [ -d "$session_dir" ]; then
         session_name=$(basename "$session_dir")
-        if [ "$session_name" != "calibration" ]; then
+        if [[ "$session_name" != *"calibration"* ]]; then
             session_dirs+=("$session_dir")
         fi
     fi
 done
+
+# Check if any session directories were found
+if [ ${#session_dirs[@]} -eq 0 ]; then
+    echo "Error: No valid session directories found."
+    exit 1
+fi
 
 # Check if SLURM_ARRAY_TASK_ID is set (indicates this is running as part of a job array)
 if [ -z "$SLURM_ARRAY_TASK_ID" ]; then

@@ -1122,10 +1122,10 @@ def setup_session(session_folder):
 
     # Models.
     SESSION_FOLDER = session_folder
-    CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Mine+Misael_Bl6_250801_180543.centroid.n=2669"
-    CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Mine+Misael_Bl6_250802_000544.centered_instance.n=2669"
-    CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/Mine+Jiaxuan_SW_250714_091628.centroid.n=4099"
-    CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/Mine+Jiaxuan_SW_250714_153818.centered_instance.n=4099"
+    CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Bl6-Defeat-Cohort_A.centroid.n=2919"
+    CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Bl6-Defeat-Cohort_A.centered_instance.n=2919"
+    CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/SW-Defeat-Cohort_A.centroid.n=4354"
+    CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/SW-Defeat-Cohort_A.centered_instance.n=4354"
 
     # Calibration file (file in session folder with "calibration" in the name).
     session_folder_contents = os.listdir(SESSION_FOLDER)
