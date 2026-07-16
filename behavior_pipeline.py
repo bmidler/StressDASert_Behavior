@@ -86,6 +86,7 @@ def reset_session(session_folder):
                 os.remove(os.path.join(unused_inference_path, file))
             os.rmdir(unused_inference_path)
 
+
 def run_sleap_inference(session_folder, centroid_model, centered_model, mouse_color):
     """
     Runs sleap inference on each camera view (video) in the session using the passed centroid and centered models.
@@ -961,10 +962,10 @@ def make_video():
     white_reprojection_tracks_file = open_h5_file_with_retry(white_reprojection_tracks_filepath, "r")
 
     # Get the list of camera views from the HDF5 file keys
-    camera_views = [key for key in black_reprojection_tracks_file.keys() if key.startswith("Camera")]
+    camera_views = [key for key in black_reprojection_tracks_file.keys() if key.startswith("Camera") or "cam" in key]
 
     # Assert the camera views are the same for both black and white mice.
-    assert camera_views == [key for key in white_reprojection_tracks_file.keys() if key.startswith("Camera")], "Camera views are not the same for black and white mice."
+    assert camera_views == [key for key in white_reprojection_tracks_file.keys() if key.startswith("Camera") or "cam" in key], "Camera views are not the same for black and white mice."
 
     for i, camera_view in enumerate(camera_views):
         print(f"\tMaking video for camera view {i + 1} of {len(camera_views)}...")
@@ -992,7 +993,7 @@ def make_video():
     white_3D_pose_filepath = os.path.join(SESSION_FOLDER, "white_triangulated.h5")
 
     # Get video information (width, height, fps) from the first video.
-    Camera0_directory = os.path.join(SESSION_FOLDER, "Camera0")
+    Camera0_directory = os.path.join(SESSION_FOLDER, TOP_CAMERA_NAME) # Use directory for overhead camera instead of "Camera0".
     video_filename = [f for f in os.listdir(Camera0_directory) if f.endswith(".mp4") and "track" not in f][0] # Makes sure we grab the original video.
     video_path = os.path.join(Camera0_directory, video_filename)
     cap = cv2.VideoCapture(video_path)
@@ -1059,10 +1060,10 @@ def run_session(cleanup_session=True):
 
     print(f"Running pipeline for session: {SESSION_NAME}")
     print("Using sleap models:")
-    print(f"\tBlack mouse centroid model: {CENTROID_MODEL_BLACK.split("/")[-1]}")
-    print(f"\tBlack mouse centered model: {CENTERED_MODEL_BLACK.split("/")[-1]}")
-    print(f"\tWhite mouse centroid model: {CENTROID_MODEL_WHITE.split("/")[-1]}")
-    print(f"\tWhite mouse centered model: {CENTERED_MODEL_WHITE.split("/")[-1]}")
+    print(f"\tBlack mouse centroid model: {CENTROID_MODEL_BLACK.split('/')[-1]}")
+    print(f"\tBlack mouse centered model: {CENTERED_MODEL_BLACK.split('/')[-1]}")
+    print(f"\tWhite mouse centroid model: {CENTROID_MODEL_WHITE.split('/')[-1]}")
+    print(f"\tWhite mouse centered model: {CENTERED_MODEL_WHITE.split('/')[-1]}")
 
     # Black mouse.
     print("Running sleap inference for black mouse...")
@@ -1122,10 +1123,10 @@ def setup_session(session_folder):
 
     # Models.
     SESSION_FOLDER = session_folder
-    CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Bl6-Defeat-Cohort_A.centroid.n=2919"
-    CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Bl6-Defeat-Cohort_A.centered_instance.n=2919"
-    CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/SW-Defeat-Cohort_A.centroid.n=4354"
-    CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/SW-Defeat-Cohort_A.centered_instance.n=4354"
+    CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Bl6-Defeat-Cohort_B.centroid.n=3978"
+    CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Bl6-Defeat-Cohort_B.centered_instance.n=3978"
+    CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/SW-Defeat-Cohort_B.centroid.n=5413"
+    CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/SW-Defeat-Cohort_B.centered_instance.n=5413"
 
     # Calibration file (file in session folder with "calibration" in the name).
     session_folder_contents = os.listdir(SESSION_FOLDER)
@@ -1136,7 +1137,7 @@ def setup_session(session_folder):
             break
     if ANIPOSE_CALIBRATION_FILE is None:
         raise FileNotFoundError("No calibration file found in session folder. Please provide a calibration file with 'calibration' in the name and that ends with .toml.")
-    TOP_CAMERA_NAME = "Camera0"  # The top-down camera name.
+    TOP_CAMERA_NAME = "Overhead-Camera" # "Camera0"  # The top-down camera name.
 
     # SLURM scripts.
     SESSION_NAME = SESSION_FOLDER.split("/")[-1]

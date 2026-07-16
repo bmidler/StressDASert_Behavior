@@ -11,7 +11,8 @@
 
 module load anacondapy/2023.07-cuda
 eval "$(conda shell.bash hook)"
-conda activate sleap
+# conda activate sleap # NOTE: this is to use the old sleap instal on the cluster (doesn't work with the new yaml files).
+conda activate sleap-update
 
 # Print job, TF, and GPU information.
 echo "Current conda environment: $(conda info --envs | grep '*' | awk '{print $1}')"

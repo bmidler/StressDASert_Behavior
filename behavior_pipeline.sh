@@ -3,6 +3,8 @@
 # USAGE: sbatch --array=0-N behavior_pipeline.sh <day_directory>
 # Where N is the number of sessions minus 1.
 
+# E.g. sbatch --array=0-23 behavior_pipeline.sh ../Data/Defeat-Cohorts/Cohort-B/Cohort_B-CSDS/Day6
+
 #SBATCH -J behavior_pipeline
 #SBATCH -c 1
 #SBATCH --mem=32GB
