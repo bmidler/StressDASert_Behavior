@@ -1125,8 +1125,8 @@ def setup_session(session_folder):
     SESSION_FOLDER = session_folder
     CENTROID_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Bl6-Defeat-Cohort_B.centroid.n=3978"
     CENTERED_MODEL_BLACK = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/Bl6/Bl6-Defeat-Cohort_B.centered_instance.n=3978"
-    CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/SW-Defeat-Cohort_B.centroid.n=5413"
-    CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/SW-Defeat-Cohort_B.centered_instance.n=5413"
+    CENTROID_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/NewSleap-Defeat-Cohort_B-SW.centered_instance.n=5413"
+    CENTERED_MODEL_WHITE = FILENAME_PREFIX + "Ben/Projects/StressDASert/Behavior/Sleap/Models/Production/SW/NewSleap-Defeat-Cohort_B-SW.centroid.n=5413"
 
     # Calibration file (file in session folder with "calibration" in the name).
     session_folder_contents = os.listdir(SESSION_FOLDER)
@@ -1137,7 +1137,7 @@ def setup_session(session_folder):
             break
     if ANIPOSE_CALIBRATION_FILE is None:
         raise FileNotFoundError("No calibration file found in session folder. Please provide a calibration file with 'calibration' in the name and that ends with .toml.")
-    TOP_CAMERA_NAME = "Overhead-Camera" # "Camera0"  # The top-down camera name.
+    TOP_CAMERA_NAME =  "Camera0" # "Overhead-Camera" # "Camera0"  # The top-down camera name.
 
     # SLURM scripts.
     SESSION_NAME = SESSION_FOLDER.split("/")[-1]
