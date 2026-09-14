@@ -331,27 +331,3 @@ the session's `.toml` was corrected, not just copied.
 **Videos aren't produced but tracking is fine.**
 Video generation is wrapped in `try/except` and prints `Error making video…` rather than
 failing the job — look for that line in the session log.
-
----
-
-## Known rough edges
-
-A few things in the current code that are worth knowing before you trust or modify it:
-
-* **The white mouse model paths look swapped.** `CENTROID_MODEL_WHITE` points at a
-  `...centered_instance...` directory and `CENTERED_MODEL_WHITE` at a `...centroid...` one.
-  Worth verifying against the actual model directories.
-* **`reset_session()` deletes `skeleton_video.mp4`**, but `make_skeleton_video()` writes
-  `3D_skeleton_video.mp4`. The rotating 3D video is therefore not cleaned up between runs and
-  is silently overwritten instead.
-* **`wait_for_inference_to_complete()` busy-waits** with no `time.sleep()` and its `for/else`
-  logic is fragile. The triangulation waiter has the same shape.
-* **`INFERENCE_SBATCH_SCRIPT` is built with `os.path.join(FILENAME_PREFIX, os.getcwd(), ...)`**,
-  which discards the prefix because `os.getcwd()` is absolute. It resolves to the current
-  directory, which is the intended behavior, but not for the reason the code implies.
-* **`run_anipose_triangulation()` waits on the *existence* of the output file**, not on job
-  completion. `open_h5_file_with_retry()` exists to paper over the resulting race when the
-  file is still being written.
-* **Two sessions cannot share a session directory**, because the `UnusedInference/` shuffle
-  mutates files in place. One array task per session keeps this safe; don't parallelize inside
-  a session.
