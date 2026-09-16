@@ -304,30 +304,6 @@ Re-running a session calls `reset_session()` first, which deletes the triangulat
 h5s, the skeleton videos, every `.h5`/`.slp` in each camera directory, and any leftover
 `UnusedInference/` folders. Anything you want to keep should be copied out first.
 
----
-
-## Troubleshooting
-
-**The head job hangs forever after submitting inference.**
-`wait_for_inference_to_complete()` polls until every camera directory contains both a
-`black*.h5` and a `white*.h5`. If an inference job died, that file never appears and the
-loop spins indefinitely (it has no sleep and no timeout, so it will also peg a core). Check
-`SBATCH_outputs/<SESSION_NAME>/black_<video>_errors.txt` and cancel the head job manually.
-
-**Inference jobs keep bouncing between nodes.**
-That's `_sleap_inference.sh` doing its job — a node claimed a GPU that torch couldn't use.
-After `MAX_GPU_RETRIES` (3) it gives up and lists the bad nodes in its log. If the probe exits
-with code 2 instead, it's a broken *install* (usually a CPU-only torch wheel) and no amount of
-retrying will help.
-
-**`--dependency=afterok` chains break on GPU retries.**
-In the default `resubmit` mode, a job that hands off to a replacement exits non-zero on
-purpose. Use `RETRY_MODE=requeue` if you need the job ID to survive.
-
-**Triangulation succeeds but the 3D pose is nonsense.**
-Almost always a calibration camera-order problem. Check `camera_order_report.csv` and confirm
-the session's `.toml` was corrected, not just copied.
-
 **Videos aren't produced but tracking is fine.**
 Video generation is wrapped in `try/except` and prints `Error making video…` rather than
 failing the job — look for that line in the session log.
